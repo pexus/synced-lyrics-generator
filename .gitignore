@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Flask
+instance/
+.webassets-cache
+
+# Application specific
+audio_input/*
+lyrics_input/*
+lrc_output/*
+srt_output/*
+processed_files.txt
+
+# Keep placeholder files to preserve directory structure
+!audio_input/README.md
+!lyrics_input/README.md
+!lrc_output/README.md
+!srt_output/README.md
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store

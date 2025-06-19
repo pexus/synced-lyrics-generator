@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synced Lyrics Generator</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            margin: 0; 
+            background-color: #f8f9fa; 
+            color: #333;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 2em auto; 
+            background: white; 
+            padding: 2em; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05); 
+        }
+        h1, h2 { 
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 0.5em;
+            margin-bottom: 1em;
+        }
+        .upload-section { 
+            margin-bottom: 2em; 
+            padding: 1.5em; 
+            background-color: #fdfdfd;
+            border: 2px solid #dee2e6; 
+            border-radius: 8px; 
+        }
+        .upload-area {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5em;
+            margin-bottom: 1.5em;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1em;
+            margin-bottom: 1em;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+        }
+        .form-group > label {
+            font-weight: bold;
+            color: #555;
+        }
+        .file-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 1em;
+        }
+        .song-list { 
+            list-style-type: none; 
+            padding: 0; 
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .song-item { 
+            display: flex; 
+            align-items: center; 
+            padding: 1em; 
+            border-bottom: 2px solid #dee2e6;
+            gap: 1em;
+        }
+        .song-item:last-child {
+            border-bottom: none;
+        }
+        .song-title { 
+            flex-grow: 1; 
+            font-size: 0.9em; 
+        }
+        .status-indicator { 
+            width: 12px; 
+            height: 12px; 
+            border-radius: 50%; 
+            background-color: #fd7e14; /* Orange for needs attention */
+            flex-shrink: 0;
+        }
+        .status-indicator.processed {
+            background-color: #28a745; /* Green for processed */
+        }
+        .song-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            text-decoration: none; 
+            color: white; 
+            background-color: #007bff; 
+            padding: 10px 15px; 
+            border-radius: 5px; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 1em;
+            display: inline-block;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .btn:hover { 
+            background-color: #0056b3; 
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-warning {
+            background-color: #fd7e14;
+        }
+        .btn-warning:hover {
+            background-color: #e66a0a;
+        }
+        .btn.disabled {
+            background-color: #6c757d;
+            opacity: 0.65;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-name {
+            font-style: italic;
+            color: #6c757d;
+        }
+        .modal { 
+            display: none; 
+            position: fixed; 
+            z-index: 2000; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.7); 
+        }
+        .modal-content { 
+            background-color: #fefefe; 
+            margin: 5% auto; 
+            padding: 0; 
+            border: 3px solid #007bff; 
+            width: 80%; 
+            max-width: 800px;
+            border-radius: 8px; 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5); 
+        }
+        .modal-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 2px solid #007bff; 
+            padding: 1em 1.5em;
+            background-color: #f8f9fa;
+        }
+        .modal-header h2 { 
+            border: none; 
+            margin: 0; 
+            font-size: 1.5em; 
+            color: #007bff;
+        }
+        .close-btn { 
+            color: #007bff; 
+            font-size: 32px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            line-height: 0.8;
+        }
+        .close-btn:hover, .close-btn:focus { 
+            color: #0056b3; 
+            text-decoration: none; 
+        }
+        #lyrics-textarea { 
+            width: calc(100% - 40px); 
+            height: 300px; 
+            padding: 20px; 
+            border: none; 
+            font-family: monospace; 
+            resize: vertical; 
+        }
+        .modal-footer { 
+            text-align: right; 
+            padding: 1em; 
+            background-color: #f8f9fa; 
+            border-top: 2px solid #007bff; 
+        }
+        .modal-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+            background: #fff;
+            white-space: pre-wrap;
+            font-family: monospace;
+            border: 1px solid #dee2e6;
+            margin: 15px;
+            border-radius: 4px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 2em;
+        }
+        .pagination a, .pagination span {
+            color: #007bff;
+            padding: 8px 16px;
+            text-decoration: none;
+            transition: background-color .3s;
+            border: 1px solid #ddd;
+            margin: 0 4px;
+            border-radius: 4px;
+        }
+        .pagination span.current {
+            background-color: #007bff;
+            color: white;
+            border: 1px solid #007bff;
+        }
+        .pagination a:hover:not(.disabled) {
+            background-color: #ddd;
+        }
+        .pagination .disabled {
+            color: #ccc;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .song-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .song-actions {
+                width: 100%;
+                margin-top: 1em;
+            }
+            .song-actions > * {
+                flex-grow: 1;
+                text-align: center;
+                margin-bottom: 0.5em;
+            }
+            .modal-content {
+                width: 90%;
+                margin: 5% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Synced Lyrics Generator</h1>
+
+        <div class="upload-section">
+            <h2>Upload New Song</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+                <div class="upload-area">
+                    <div class="form-group">
+                        <label for="audio-file-input">Audio File (.mp3, .wav)</label>
+                        <div class="file-input-wrapper">
+                            <label for="audio-file-input" class="btn btn-secondary">Browse...</label>
+                            <input type="file" id="audio-file-input" name="audio" accept=".mp3,.wav" required>
+                            <span id="audio-file-name" class="file-name">No file selected.</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="lyrics-file-input">Lyrics File (.txt)</label>
+                        <div class="file-input-wrapper">
+                            <label for="lyrics-file-input" class="btn btn-secondary">Browse...</label>
+                            <input type="file" id="lyrics-file-input" name="lyrics" accept=".txt" required>
+                            <span id="lyrics-file-name" class="file-name">No file selected.</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <button type="submit" class="btn">Upload Song</button>
+                </div>
+            </form>
+        </div>
+
+        <h2>Song Library</h2>
+        <div class="song-list">
+            {% for status in all_audio_statuses %}
+        <div class="song-item">
+            <span class="status-indicator {{ 'processed' if status.is_processed else '' }}"></span>
+            <span class="song-title">{{ status.basename }}</span>
+            <div class="song-actions">
+                <form action="/upload_lyrics_for/{{ status.basename }}" method="post" enctype="multipart/form-data" style="display: inline-block;" class="upload-lyrics-form">
+                    <label for="lyrics-upload-{{ status.basename }}" class="btn btn-primary">Browse/Upload Lyrics</label>
+                    <input type="file" name="lyrics_file" id="lyrics-upload-{{ status.basename }}" style="display: none;" onchange="this.form.submit()">
+                </form>
+
+                {% if status.has_lyrics %}
+                    <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">View/Edit</a>
+                    <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')" {{ 'disabled' if not status.is_processed }}>Re-generate</button>
+                {% else %}
+                    <a href="/editor/{{ status.audio }}/{{ status.basename }}.txt" class="btn btn-warning">Generate</a>
+                {% endif %}
+
+                <a href="/debug/lrc/{{ status.basename }}" class="btn btn-secondary" {% if not status.is_processed %}disabled="disabled"{% endif %}>LRC</a>
+                <a href="/debug/srt/{{ status.basename }}" class="btn btn-secondary" {% if not status.is_processed %}disabled="disabled"{% endif %}>SRT</a>
+                <button class="btn btn-danger" onclick="deleteSong('{{ status.basename }}')">Delete</button>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            <a href="{{ url_for('index', page=page-1) }}" class="{{ 'disabled' if page == 1 else '' }}">&laquo; Previous</a>
+            
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                    <span class="current">{{ p }}</span>
+                {% else %}
+                    <a href="{{ url_for('index', page=p) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            <a href="{{ url_for('index', page=page+1) }}" class="{{ 'disabled' if page == total_pages else '' }}">Next &raquo;</a>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- The Modal -->
+    <div id="lyrics-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+            <h2>Edit Lyrics</h2>
+            <span class="close-btn" id="close-lyrics-modal">&times;</span>
+        </div>
+        <textarea id="lyrics-textarea"></textarea>
+        <div class="modal-footer">
+            <button id="save-lyrics-btn" class="btn">Save Lyrics</button>
+        </div>
+    </div>
+
+    <!-- File Viewer Modal -->
+    <div id="file-viewer-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="file-viewer-title">File Content</h2>
+                <span class="close-btn" id="close-file-viewer">&times;</span>
+            </div>
+            <div class="modal-body" id="file-content-display">
+                Loading content...
+            </div>
+            <div class="modal-footer">
+                <a id="download-file-btn" href="#" class="btn btn-primary" download>Download</a>
+                <button class="btn btn-secondary" id="close-viewer-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Debug helper
+        function logToConsole(message) {
+            console.log("DEBUG: " + message);
+        }
+        
+        // Handle file selection display
+        document.getElementById('audio-file-input').addEventListener('change', function() {
+            var fileName = this.files[0] ? this.files[0].name : "No file selected.";
+            document.getElementById('audio-file-name').textContent = fileName;
+        });
+
+        document.getElementById('lyrics-file-input').addEventListener('change', function() {
+            var fileName = this.files[0] ? this.files[0].name : "No file selected.";
+            document.getElementById('lyrics-file-name').textContent = fileName;
+        });
+
+        // Setup form validation
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            const audioFile = document.getElementById('audio-file-input').files[0];
+            const lyricsFile = document.getElementById('lyrics-file-input').files[0];
+            
+            if (!audioFile || !lyricsFile) {
+                e.preventDefault();
+                alert('Please select both an audio file and a lyrics file.');
+                return false;
+            }
+            
+            // Rename form fields to match backend expectations
+            const audioInput = document.getElementById('audio-file-input');
+            const lyricsInput = document.getElementById('lyrics-file-input');
+            audioInput.name = 'audio_file';
+            lyricsInput.name = 'lyrics_file';
+        });
+
+        // ===== DIRECT FUNCTION HANDLERS =====
+        
+        // View file function (LRC/SRT)
+        function viewFile(type, basename) {
+            console.log(`Viewing ${type} file for ${basename}`);
+            
+            try {
+                // Get modal elements with error handling
+                const modal = document.getElementById('file-viewer-modal');
+                if (!modal) {
+                    console.error("Modal element not found!");
+                    return;
+                }
+                
+                const title = document.getElementById('file-viewer-title');
+                const content = document.getElementById('file-content-display');
+                const downloadBtn = document.getElementById('download-file-btn');
+                
+                if (!title || !content || !downloadBtn) {
+                    console.error("One or more modal elements not found!");
+                    return;
+                }
+                
+                // Set title and prepare modal
+                title.textContent = `${type.toUpperCase()} File Content for ${basename}`;
+                content.textContent = "Loading...";
+                
+                // Set download link right away
+                downloadBtn.href = `/download_${type}/${basename}`;
+                downloadBtn.download = `${basename}.${type}`;
+                downloadBtn.style.display = 'inline-block';
+                
+                // Show the modal immediately
+                modal.style.display = 'block';
+                
+                // Use a more reliable method - XMLHttpRequest instead of fetch
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `/view_${type}/${basename}`, true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            content.textContent = xhr.responseText;
+                            console.log("File content loaded successfully");
+                        } else {
+                            content.textContent = `Error loading file: ${xhr.status} ${xhr.statusText}`;
+                            console.error("Error loading file:", xhr.status, xhr.statusText);
+                        }
+                    }
+                };
+                xhr.send();
+                
+                // Ensure the modal is visible regardless of XHR status
+                setTimeout(function() {
+                    if (modal.style.display !== 'block') {
+                        modal.style.display = 'block';
+                        console.log("Forced modal display via timeout");
+                    }
+                }, 500);
+                
+            } catch (e) {
+                console.error("Error in viewFile function:", e);
+                // Still show the modal even if there's an error
+                const modal = document.getElementById('file-viewer-modal');
+                const content = document.getElementById('file-content-display');
+                if (modal) modal.style.display = 'block';
+                if (content) content.textContent = `Error: ${e.message}`;
+            }
+        }
+        
+        // Re-generate lyrics
+        function regenerateLyrics(basename, audioFile) {
+            if (confirm(`Are you sure you want to re-generate synced lyrics for "${basename}"?`)) {
+                logToConsole(`Regenerating lyrics for ${basename} with audio ${audioFile}`);
+                window.location.href = `/editor/${audioFile}/${basename}.txt`;
+            }
+        }
+        
+        // Delete song
+        function deleteSong(basename) {
+            if (confirm(`Are you sure you want to delete all files related to "${basename}"?`)) {
+                logToConsole(`Deleting ${basename}`);
+                
+                fetch(`/delete_song/${basename}`, { 
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting song: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error deleting song: ' + error.message);
+                });
+            }
+        }
+        
+        // ===== MODAL HANDLING =====
+        
+        // Pre-load modal elements to make sure they're available
+        const fileViewerModal = document.getElementById('file-viewer-modal');
+        const closeFileViewerBtn = document.getElementById('close-file-viewer');
+        const closeViewerBtn = document.getElementById('close-viewer-btn');
+        const fileContentDisplay = document.getElementById('file-content-display');
+        const fileViewerTitle = document.getElementById('file-viewer-title');
+        const downloadFileBtn = document.getElementById('download-file-btn');
+        
+        // Make sure the elements exist
+        if (!fileViewerModal || !closeFileViewerBtn || !fileContentDisplay || !fileViewerTitle || !downloadFileBtn) {
+            console.error("One or more modal elements are missing from the page");
+        }
+        
+        // Close button handlers - using addEventListener for better reliability
+        closeFileViewerBtn.addEventListener('click', function() {
+            fileViewerModal.style.display = "none";
+            console.log("Close button clicked");
+        });
+        
+        closeViewerBtn.addEventListener('click', function() {
+            fileViewerModal.style.display = "none";
+            console.log("Bottom close button clicked");
+        });
+        
+        document.getElementById('close-lyrics-modal').addEventListener('click', function() {
+            document.getElementById('lyrics-modal').style.display = "none";
+            console.log("Lyrics modal closed");
+        });
+        
+        // Close on outside click
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('file-viewer-modal')) {
+                document.getElementById('file-viewer-modal').style.display = "none";
+            }
+            if (event.target == document.getElementById('lyrics-modal')) {
+                document.getElementById('lyrics-modal').style.display = "none";
+            }
+        };
+    </script>
+</body>
+</html>

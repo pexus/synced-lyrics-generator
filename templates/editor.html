@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LRC Editor</title>
+    <script src="https://unpkg.com/wavesurfer.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 2em;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .instructions {
+            margin-bottom: 2em;
+            padding: 1em;
+            background: #f1f3f5;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .instructions p {
+            margin: 0.5em 0;
+            font-size: 1.1em;
+            color: #555;
+        }
+
+        .instructions strong {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .instructions a {
+            color: #333;
+            text-decoration: none;
+        }
+
+        .instructions a:hover {
+            text-decoration: underline;
+        }
+
+        #waveform-container {
+            display: flex;
+            align-items: center;
+            gap: 1em;
+            margin-bottom: 2em;
+        }
+
+        .waveform-btn {
+            color: white;
+            text-decoration: none;
+            border: none;
+            border-radius: 5px;
+            padding: 1em 0;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100px;
+            flex-shrink: 0;
+            text-align: center;
+            font-size: 1em;
+            transition: background-color 0.2s;
+        }
+
+        #play-pause-btn {
+            background: #28a745;
+            /* Green */
+        }
+
+        #play-pause-btn:hover {
+            background: #218838;
+            /* Darker Green */
+        }
+
+        #back-btn {
+            background: #6c757d;
+        }
+
+        #back-btn:hover {
+            background: #5a6268;
+        }
+
+        #waveform {
+            flex-grow: 1;
+            /* Waveform takes remaining space */
+            width: 100%;
+        }
+
+        #lyrics-container {
+            margin-top: 1em;
+            max-height: 40vh;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+
+        .line {
+            padding: 10px 15px;
+            cursor: default;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 1.2em;
+            transition: background-color 0.2s;
+        }
+
+        .line:last-child {
+            border-bottom: none;
+        }
+
+        .line.active {
+            background-color: #eee;
+            font-weight: bold;
+        }
+
+        .line.synced {
+            color: #28a745;
+            font-weight: bold;
+            background-color: rgba(40, 167, 69, 0.1);
+            border-left: 3px solid #28a745;
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 2em;
+        }
+
+        .btn {
+            text-decoration: none;
+            color: white;
+            background-color: #007bff;
+            padding: 12px 25px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+            margin: 0 0.5em;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="instructions">
+            <p><strong style="color: #28a745;">1. Press Play to start the audio</strong></p>
+            <p><strong style="color: #007bff;">2. HOLD YOUR SPACEBAR DOWN</strong> exactly when the singer starts the highlighted line.</p>
+            <p><strong style="color: #007bff;">3. RELEASE YOUR SPACEBAR</strong> when the line is finished.</p>
+            <p><strong style="color: #fd7e14;">4. Repeat this process for each line of lyrics.</strong> Successfully synced lines will turn <span style="color: #28a745; font-weight: bold;">green</span>.</p>
+            <p>Press <strong>DELETE</strong> key to undo the current line if you make a mistake, or <a href="#"
+                    id="reset-link">click here to reset all</a>.</p>
+            <p>Files will be saved automatically after the last line is synced.</p>
+        </div>
+
+        <div id="waveform-container">
+            <a href="{{ url_for('index') }}" id="back-btn" class="waveform-btn">Back</a>
+            <button id="play-pause-btn" class="waveform-btn">Play</button>
+            <div id="waveform"></div>
+        </div>
+
+        <div id="lyrics-container">
+            {% for line in lyrics_lines %}
+            <div class="line" data-index="{{ loop.index0 }}">{{ line }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="actions" id="actions-container">
+            <!-- Buttons will be added here dynamically -->
+        </div>
+    </div>
+
+    <script>
+        const wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#e0e0e0',
+            progressColor: '#333333',
+            cursorColor: '#333333',
+            barWidth: 1,
+            barRadius: 0,
+            cursorWidth: 1,
+            height: 80,
+            barGap: 0,
+            responsive: true
+        });
+
+        wavesurfer.load("{{ url_for('serve_audio', filename=audio_file) }}");
+
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const lines = document.querySelectorAll('.line');
+        const resetLink = document.getElementById('reset-link');
+        const actionsContainer = document.getElementById('actions-container');
+        const timestamps = new Array(lines.length).fill(null);
+        let activeLineIndex = 0;
+        let spacebarDown = false;
+
+        function setActiveLine(index) {
+            lines.forEach((line, i) => {
+                line.classList.remove('active');
+                if (i === index) {
+                    line.classList.add('active');
+                    line.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            });
+        }
+
+        playPauseBtn.addEventListener('click', () => {
+            wavesurfer.playPause();
+        });
+
+        wavesurfer.on('play', () => {
+            playPauseBtn.textContent = 'Pause';
+        });
+
+        wavesurfer.on('pause', () => {
+            playPauseBtn.textContent = 'Play';
+        });
+
+        wavesurfer.on('finish', () => {
+            playPauseBtn.textContent = 'Play';
+        });
+
+        function saveSyncedLyrics() {
+            const lyricsData = [];
+            let syncedCount = 0;
+            
+            lines.forEach((line, index) => {
+                lyricsData.push({
+                    text: line.innerText,
+                    time: timestamps[index]
+                });
+                
+                if (timestamps[index] !== null) {
+                    syncedCount++;
+                }
+            });
+
+            // Validate that we have at least some synced lines
+            if (syncedCount === 0) {
+                alert("No synced lines detected! Please sync at least one line by holding spacebar while the audio plays.");
+                return;
+            }
+            
+            console.log(`Saving ${syncedCount} synced lines out of ${lines.length} total lines`);
+
+            fetch("{{ url_for('save_synced_lyrics') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        audio_file: '{{ audio_file }}',
+                        lyrics_data: lyricsData  // Send all lines, backend will filter
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showPostSaveActions();
+                    } else {
+                        alert('Error saving files: ' + (data.message || 'Unknown error') + 
+                              '\n\nPlease make sure you have synced at least some lines by holding spacebar while the audio plays.');
+                    }
+                })
+                .catch(error => {
+                    console.error("Error saving synced lyrics:", error);
+                    alert("Failed to save synced lyrics due to an error. Please try again.");
+                });
+        }
+
+        function showPostSaveActions() {
+            // Count how many lines were successfully synced
+            const syncedCount = timestamps.filter(time => time !== null).length;
+            const totalLines = timestamps.length;
+            const syncPercentage = Math.round((syncedCount / totalLines) * 100);
+            
+            // Create a status message
+            let statusClass = syncPercentage >= 80 ? 'success' : (syncPercentage >= 40 ? 'warning' : 'danger');
+            let statusMessage = '';
+            
+            if (syncPercentage >= 80) {
+                statusMessage = `<div style="color: #28a745; margin-bottom: 15px; font-weight: bold;">Great job! ${syncedCount} of ${totalLines} lines synced (${syncPercentage}%)</div>`;
+            } else if (syncPercentage >= 40) {
+                statusMessage = `<div style="color: #fd7e14; margin-bottom: 15px; font-weight: bold;">Partial sync: ${syncedCount} of ${totalLines} lines synced (${syncPercentage}%)</div>`;
+            } else {
+                statusMessage = `<div style="color: #dc3545; margin-bottom: 15px; font-weight: bold;">Warning: Only ${syncedCount} of ${totalLines} lines synced (${syncPercentage}%)</div>`;
+            }
+            
+            actionsContainer.innerHTML = `
+                ${statusMessage}
+                <a href="{{ url_for('debug_lrc', basename=basename) }}" target="_blank" class="btn btn-secondary">View LRC</a>
+                <a href="{{ url_for('debug_srt', basename=basename) }}" target="_blank" class="btn btn-secondary">View SRT</a>
+                <a href="{{ url_for('index') }}" class="btn">Back to Main Page</a>
+                <button onclick="resetAndTryAgain()" class="btn btn-warning" style="margin-top: 15px;">Reset & Try Again</button>
+            `;
+        }
+        
+        function resetAndTryAgain() {
+            if (confirm('Are you sure you want to reset all timestamps and try again?')) {
+                timestamps.fill(null);
+                lines.forEach(line => line.classList.remove('synced'));
+                activeLineIndex = 0;
+                setActiveLine(0);
+                wavesurfer.seekTo(0);
+                wavesurfer.pause();
+                actionsContainer.innerHTML = '';
+            }
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!spacebarDown) {
+                    spacebarDown = true;
+                }
+            } else if (e.code === 'Delete' || e.code === 'Backspace') {
+                e.preventDefault();
+                if (activeLineIndex > 0) {
+                    activeLineIndex--;
+                    timestamps[activeLineIndex] = null;
+                    lines[activeLineIndex].classList.remove('synced');
+                    setActiveLine(activeLineIndex);
+                    actionsContainer.innerHTML = ''; // Clear post-save buttons if user goes back
+                }
+            }
+        });
+
+        document.addEventListener('keyup', function (e) {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (spacebarDown) {
+                    spacebarDown = false;
+                    if (activeLineIndex < lines.length) {
+                        timestamps[activeLineIndex] = wavesurfer.getCurrentTime();
+                        lines[activeLineIndex].classList.add('synced');
+
+                        if (activeLineIndex < lines.length - 1) {
+                            activeLineIndex++;
+                            setActiveLine(activeLineIndex);
+                        } else {
+                            setActiveLine(null); // All lines timestamped
+                            wavesurfer.pause();
+                            saveSyncedLyrics();
+                        }
+                    }
+                }
+            }
+        });
+
+        resetLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (confirm('Are you sure you want to reset all timestamps?')) {
+                timestamps.fill(null);
+                lines.forEach(line => line.classList.remove('synced'));
+                activeLineIndex = 0;
+                setActiveLine(0);
+                wavesurfer.seekTo(0);
+                wavesurfer.pause();
+                actionsContainer.innerHTML = '';
+            }
+        });
+
+        setActiveLine(0);
+    </script>
+</body>
+
+</html>
