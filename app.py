@@ -6,6 +6,13 @@ from math import ceil
 
 app = Flask(__name__)
 
+# Create a custom filter to check if file exists
+@app.template_filter('file_exists')
+def file_exists_filter(filename, folder):
+    """Check if a file exists and has content"""
+    filepath = os.path.join(folder, filename)
+    return os.path.exists(filepath) and os.path.getsize(filepath) > 0
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 app.logger.setLevel(logging.DEBUG)
@@ -42,6 +49,10 @@ def index():
     page = request.args.get('page', 1, type=int)
     per_page = 10
 
+    # Make folder config available to templates
+    app.config['LRC_OUTPUT_FOLDER'] = LRC_OUTPUT_FOLDER
+    app.config['SRT_OUTPUT_FOLDER'] = SRT_OUTPUT_FOLDER
+    
     processed_basenames = get_processed_files()
     all_audio_files = sorted([f for f in os.listdir(AUDIO_INPUT_FOLDER) if f.endswith(('.mp3', '.wav'))])
     lyrics_files_set = set(os.listdir(LYRICS_INPUT_FOLDER))
@@ -55,12 +66,30 @@ def index():
     for audio_file in paginated_audio_files:
         base_name = os.path.splitext(audio_file)[0]
         lyrics_file = base_name + '.txt'
+        
+        # Check if LRC and SRT files actually exist and have content
+        lrc_path = os.path.join(LRC_OUTPUT_FOLDER, base_name + '.lrc')
+        srt_path = os.path.join(SRT_OUTPUT_FOLDER, base_name + '.srt')
+        
+        # Consider a file processed only if it's in the processed list AND the output files exist
+        is_processed = base_name in processed_basenames
+        if is_processed:
+            # Double-check that files exist and have content
+            lrc_exists = os.path.exists(lrc_path) and os.path.getsize(lrc_path) > 0
+            srt_exists = os.path.exists(srt_path) and os.path.getsize(srt_path) > 0
+            is_processed = lrc_exists and srt_exists
+            
+            # If we found inconsistency, update the processed_files list
+            if not is_processed and base_name in processed_basenames:
+                app.logger.warning(f"Song {base_name} marked as processed but missing output files")
+                # Consider removing from processed list here if needed
+        
         all_audio_statuses.append({
             'audio': audio_file,
             'basename': base_name,
             'lyrics': lyrics_file,
             'has_lyrics': lyrics_file in lyrics_files_set,
-            'is_processed': base_name in processed_basenames
+            'is_processed': is_processed
         })
 
     total_pages = ceil(total_songs / per_page)

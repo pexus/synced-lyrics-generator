@@ -136,11 +136,12 @@
             background-color: #e66a0a;
         }
         .btn.disabled {
-            background-color: #6c757d;
-            opacity: 0.5;
+            background-color: #e9ecef;
+            color: #adb5bd;
+            opacity: 0.65;
             cursor: not-allowed;
             pointer-events: none;
-            border: 1px solid #ccc;
+            border: 1px solid #ced4da;
         }
         input[type="file"] {
             display: none;
@@ -318,13 +319,24 @@
 
                 {% if status.has_lyrics %}
                     <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">View/Edit</a>
-                    <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')" {{ 'disabled' if not status.is_processed }}>Re-generate</button>
+                    {% if status.is_processed %}
+                        <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')">Re-generate</button>
+                    {% else %}
+                        <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-warning">Generate</a>
+                    {% endif %}
                 {% else %}
                     <a href="/editor/{{ status.audio }}/{{ status.basename }}.txt" class="btn btn-warning">Generate</a>
                 {% endif %}
 
-                <a href="/debug/lrc/{{ status.basename }}" class="btn btn-secondary" {% if not status.is_processed %}disabled="disabled"{% endif %}>LRC</a>
-                <a href="/debug/srt/{{ status.basename }}" class="btn btn-secondary" {% if not status.is_processed %}disabled="disabled"{% endif %}>SRT</a>
+                {% set lrc_file_exists = (status.basename + '.lrc') | file_exists(config.LRC_OUTPUT_FOLDER) %}
+                {% set srt_file_exists = (status.basename + '.srt') | file_exists(config.SRT_OUTPUT_FOLDER) %}
+                
+                <a href="/debug/lrc/{{ status.basename }}" 
+                   class="btn {% if lrc_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
+                   {% if not lrc_file_exists %}disabled="disabled"{% endif %}>LRC</a>
+                <a href="/debug/srt/{{ status.basename }}" 
+                   class="btn {% if srt_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
+                   {% if not srt_file_exists %}disabled="disabled"{% endif %}>SRT</a>
                 <button class="btn btn-danger" onclick="deleteSong('{{ status.basename }}')">Delete</button>
             </div>
         </div>
