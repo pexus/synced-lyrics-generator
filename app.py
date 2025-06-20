@@ -177,10 +177,27 @@ def editor(audio_file, lyrics_file):
     if not os.path.exists(lyrics_path):
         # Handle case where lyrics file might be missing
         return "Lyrics file not found.", 404
+    
     with open(lyrics_path, 'r') as f:
-        lyrics_lines = f.read().splitlines()
+        # Read all the lines first
+        all_lines = f.read().splitlines()
+        
+    # Filter out empty lines
+    lyrics_lines = [line for line in all_lines if line.strip()]
+    
+    # Calculate how many blank lines were removed
+    blank_lines_count = len(all_lines) - len(lyrics_lines)
+    
+    # Log how many lines were filtered
+    app.logger.debug(f"Filtered lyrics: {len(lyrics_lines)} non-empty lines found, removed {blank_lines_count} blank lines from {lyrics_file}")
+    
     basename = os.path.splitext(audio_file)[0]
-    return render_template('editor.html', audio_file=audio_file, lyrics_lines=lyrics_lines, lyrics_file=lyrics_file, basename=basename)
+    return render_template('editor.html', 
+                          audio_file=audio_file, 
+                          lyrics_lines=lyrics_lines, 
+                          lyrics_file=lyrics_file, 
+                          basename=basename,
+                          blank_lines_removed=blank_lines_count)
 
 @app.route('/save_synced_lyrics', methods=['POST'])
 def save_synced_lyrics():

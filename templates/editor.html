@@ -169,6 +169,12 @@
             <p>Press <strong>DELETE</strong> key to undo the current line if you make a mistake, or <a href="#"
                     id="reset-link">click here to reset all</a>.</p>
             <p>Files will be saved automatically after the last line is synced.</p>
+            
+            {% if blank_lines_removed and blank_lines_removed > 0 %}
+            <p style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                <strong>Note:</strong> {{ blank_lines_removed }} blank line{% if blank_lines_removed > 1 %}s were{% else %} was{% endif %} removed from the lyrics file for better syncing accuracy.
+            </p>
+            {% endif %}
         </div>
 
         <div id="waveform-container">
