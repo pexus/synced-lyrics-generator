@@ -93,30 +93,45 @@ def save_lyrics():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
+        app.logger.debug("Upload request received")
         # Check if files are in the request
         if 'audio_file' not in request.files or 'lyrics_file' not in request.files:
+            app.logger.error("Missing audio or lyrics files in request")
             return "Missing audio or lyrics files", 400
         
         audio_file = request.files['audio_file']
         lyrics_file = request.files['lyrics_file']
         
         if audio_file.filename == '' or lyrics_file.filename == '':
+            app.logger.error("Empty filename in uploaded files")
             return "No files selected", 400
+        
+        # Check file types
+        if not (audio_file.filename.lower().endswith(('.mp3', '.wav'))):
+            app.logger.error(f"Invalid audio file type: {audio_file.filename}")
+            return "Invalid audio file type. Please use MP3 or WAV files.", 400
+            
+        if not lyrics_file.filename.lower().endswith('.txt'):
+            app.logger.error(f"Invalid lyrics file type: {lyrics_file.filename}")
+            return "Invalid lyrics file type. Please use TXT files.", 400
         
         # Save audio file
         audio_path = os.path.join(app.config['AUDIO_INPUT_FOLDER'], audio_file.filename)
         audio_file.save(audio_path)
+        app.logger.debug(f"Saved audio file to {audio_path}")
         
         # Get base name and save lyrics with matching name
         base_name = os.path.splitext(audio_file.filename)[0]
         lyrics_filename = base_name + '.txt'
         lyrics_path = os.path.join(app.config['LYRICS_INPUT_FOLDER'], lyrics_filename)
         lyrics_file.save(lyrics_path)
+        app.logger.debug(f"Saved lyrics file to {lyrics_path}")
         
+        app.logger.debug("File upload successful")
         return redirect(url_for('index'))
     except Exception as e:
-        print(f"Error in upload_file: {str(e)}")
-        return str(e), 500
+        app.logger.error(f"Error in upload_file: {str(e)}")
+        return f"Error uploading files: {str(e)}", 500
 
 @app.route('/upload_lyrics_for/<basename>', methods=['POST'])
 def upload_lyrics_for(basename):

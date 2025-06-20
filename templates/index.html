@@ -137,9 +137,10 @@
         }
         .btn.disabled {
             background-color: #6c757d;
-            opacity: 0.65;
+            opacity: 0.5;
             cursor: not-allowed;
             pointer-events: none;
+            border: 1px solid #ccc;
         }
         input[type="file"] {
             display: none;
@@ -298,7 +299,7 @@
                     </div>
                 </div>
                 <div style="text-align: center;">
-                    <button type="submit" class="btn">Upload Song</button>
+                    <button type="submit" id="upload-btn" class="btn disabled" disabled>Upload Song</button>
                 </div>
             </form>
         </div>
@@ -384,15 +385,32 @@
             console.log("DEBUG: " + message);
         }
         
+        // Function to check if both files are selected and enable/disable the upload button
+        function checkFilesAndToggleButton() {
+            const audioFile = document.getElementById('audio-file-input').files[0];
+            const lyricsFile = document.getElementById('lyrics-file-input').files[0];
+            const uploadBtn = document.getElementById('upload-btn');
+            
+            if (audioFile && lyricsFile) {
+                uploadBtn.classList.remove('disabled');
+                uploadBtn.disabled = false;
+            } else {
+                uploadBtn.classList.add('disabled');
+                uploadBtn.disabled = true;
+            }
+        }
+        
         // Handle file selection display
         document.getElementById('audio-file-input').addEventListener('change', function() {
             var fileName = this.files[0] ? this.files[0].name : "No file selected.";
             document.getElementById('audio-file-name').textContent = fileName;
+            checkFilesAndToggleButton();
         });
 
         document.getElementById('lyrics-file-input').addEventListener('change', function() {
             var fileName = this.files[0] ? this.files[0].name : "No file selected.";
             document.getElementById('lyrics-file-name').textContent = fileName;
+            checkFilesAndToggleButton();
         });
 
         // Setup form validation
@@ -400,9 +418,9 @@
             const audioFile = document.getElementById('audio-file-input').files[0];
             const lyricsFile = document.getElementById('lyrics-file-input').files[0];
             
+            // Double-check that both files are selected (as a safety measure)
             if (!audioFile || !lyricsFile) {
                 e.preventDefault();
-                alert('Please select both an audio file and a lyrics file.');
                 return false;
             }
             
@@ -411,6 +429,11 @@
             const lyricsInput = document.getElementById('lyrics-file-input');
             audioInput.name = 'audio_file';
             lyricsInput.name = 'lyrics_file';
+            
+            // Show loading state on button
+            const uploadBtn = document.getElementById('upload-btn');
+            uploadBtn.textContent = 'Uploading...';
+            uploadBtn.disabled = true;
         });
 
         // ===== DIRECT FUNCTION HANDLERS =====
