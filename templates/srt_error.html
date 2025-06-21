@@ -1,0 +1,23 @@
+{% extends "debug_base.html" %}
+{% block title %}SRT Error for {{ basename }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>SRT Debug Error for: {{ basename }}</h2>
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">SRT File Not Found</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <p><strong>Error:</strong> The SRT file for "{{ basename }}" does not exist.</p>
+                <p>Expected path: <code>{{ srt_path }}</code></p>
+            </div>
+            <div class="mt-3">
+                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-home"></i> Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

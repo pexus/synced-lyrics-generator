@@ -1,0 +1,25 @@
+{% extends "debug_base.html" %}
+{% block title %}SRT Content for {{ basename }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>SRT Debug View for: {{ basename }}</h2>
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">SRT Content</h5>
+        </div>
+        <div class="card-body">
+            <div class="actions mb-3">
+                <a href="{{ url_for('files.download_srt', basename=basename) }}" class="btn btn-success">
+                    <i class="fas fa-download"></i> Download SRT File
+                </a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-home"></i> Back to Home
+                </a>
+            </div>
+            <div class="border p-3 bg-light">
+                <pre class="mb-0">{{ content }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

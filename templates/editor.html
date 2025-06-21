@@ -178,7 +178,7 @@
         </div>
 
         <div id="waveform-container">
-            <a href="{{ url_for('index') }}" id="back-btn" class="waveform-btn">Back</a>
+            <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn">Back</a>
             <button id="play-pause-btn" class="waveform-btn">Play</button>
             <div id="waveform"></div>
         </div>
@@ -208,7 +208,7 @@
             responsive: true
         });
 
-        wavesurfer.load("{{ url_for('serve_audio', filename=audio_file) }}");
+        wavesurfer.load("{{ url_for('upload.serve_audio', filename=audio_file) }}");
 
         const playPauseBtn = document.getElementById('play-pause-btn');
         const lines = document.querySelectorAll('.line');
@@ -270,7 +270,7 @@
             
             console.log(`Saving ${syncedCount} synced lines out of ${lines.length} total lines`);
 
-            fetch("{{ url_for('save_synced_lyrics') }}", {
+            fetch("{{ url_for('lyrics.save_synced_lyrics') }}", {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -315,9 +315,9 @@
             
             actionsContainer.innerHTML = `
                 ${statusMessage}
-                <a href="{{ url_for('debug_lrc', basename=basename) }}" target="_blank" class="btn btn-secondary">View LRC</a>
-                <a href="{{ url_for('debug_srt', basename=basename) }}" target="_blank" class="btn btn-secondary">View SRT</a>
-                <a href="{{ url_for('index') }}" class="btn">Back to Main Page</a>
+                <a href="{{ url_for('files.debug_lrc', basename=basename) }}" target="_blank" class="btn btn-secondary">View LRC</a>
+                <a href="{{ url_for('files.debug_srt', basename=basename) }}" target="_blank" class="btn btn-secondary">View SRT</a>
+                <a href="{{ url_for('main.index') }}" class="btn">Back to Main Page</a>
                 <button onclick="resetAndTryAgain()" class="btn btn-warning" style="margin-top: 15px;">Reset & Try Again</button>
             `;
         }
