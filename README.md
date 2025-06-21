@@ -76,7 +76,7 @@ http://127.0.0.1:5000/
 ## Project Structure
 
 ```
-syncedLyrics/
+synced-lyrics-generator/
 │
 ├── app.py                 # Flask application 
 ├── requirements.txt       # Python dependencies
