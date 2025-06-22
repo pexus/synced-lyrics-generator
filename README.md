@@ -2,7 +2,7 @@
 
 A web-based tool to create, manage, and edit synchronized lyrics files (LRC and SRT) for audio tracks.
 
-![Synced Lyrics Generator](https://i.imgur.com/2XbEXEh.png)
+<img src="appImage.png" alt="Synced Lyrics Generator Screenshot" width="500" style="display: block; margin: 0 auto;"/>
 
 ## Features
 
