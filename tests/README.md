@@ -6,6 +6,7 @@ This directory contains test scripts for the SyncedLyrics application.
 
 - `test_templates.py`: Tests the rendering of LRC and SRT debug templates (uses requests to test live server)
 - `test_routes.py`: Tests the Flask routes using the Flask test client
+- `test_filters.py`: Tests utility Jinja filters with pytest
 - `run_tests.py`: A test runner script that can run all tests or a specific test
 
 ## Running Tests
