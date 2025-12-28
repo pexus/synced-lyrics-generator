@@ -58,7 +58,6 @@ def save_synced_lyrics():
         end_time = valid_lyrics_data[i+1]['time'] if i + 1 < len(valid_lyrics_data) else start_time + 2
         start_h, start_m, start_s, start_ms = int(start_time/3600), int(start_time/60)%60, int(start_time)%60, int(start_time*1000)%1000
         end_h, end_m, end_s, end_ms = int(end_time/3600), int(end_time/60)%60, int(end_time)%60, int(end_time*1000)%1000
-        srt_content += f'{i+1}\n'
         srt_content += f'{start_h:02d}:{start_m:02d}:{start_s:02d},{start_ms:03d} --> {end_h:02d}:{end_m:02d}:{end_s:02d},{end_ms:03d}\n'
         srt_content += f'{item["text"]}\n\n'
     srt_path = os.path.join(SRT_OUTPUT_FOLDER, base_name + '.srt')

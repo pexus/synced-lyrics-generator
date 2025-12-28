@@ -90,6 +90,14 @@
             background: #5a6268;
         }
 
+        #reset-btn {
+            background: #dc3545;
+        }
+
+        #reset-btn:hover {
+            background: #bd2130;
+        }
+
         #waveform {
             flex-grow: 1;
             /* Waveform takes remaining space */
@@ -119,6 +127,11 @@
         .line.active {
             background-color: #eee;
             font-weight: bold;
+        }
+
+        .line.pressing {
+            background-color: #e3f2fd;
+            border-left: 3px solid #0d6efd;
         }
 
         .line.synced {
@@ -156,30 +169,44 @@
         .btn-secondary:hover {
             background-color: #5a6268;
         }
+
+        #capture-indicator {
+            display: none;
+            margin-top: 0.5em;
+            padding: 0.6em 0.8em;
+            border-radius: 6px;
+            background: #e7f1ff;
+            color: #0d6efd;
+            font-weight: 600;
+        }
+
+        #capture-indicator.active {
+            display: block;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="instructions">
-            <p><strong style="color: #28a745;">1. Press Play to start the audio</strong></p>
-            <p><strong style="color: #007bff;">2. HOLD YOUR SPACEBAR DOWN</strong> exactly when the singer starts the highlighted line.</p>
-            <p><strong style="color: #007bff;">3. RELEASE YOUR SPACEBAR</strong> when the line is finished.</p>
-            <p><strong style="color: #fd7e14;">4. Repeat this process for each line of lyrics.</strong> Successfully synced lines will turn <span style="color: #28a745; font-weight: bold;">green</span>.</p>
-            <p>Press <strong>DELETE</strong> key to undo the current line if you make a mistake, or <a href="#"
-                    id="reset-link">click here to reset all</a>.</p>
-            <p>Files will be saved automatically after the last line is synced.</p>
+            <p><strong style="color: #28a745;">Press Play</strong> to start the audio, then</p>
+            <p><strong style="color: #007bff;">HOLD YOUR SPACEBAR DOWN</strong> exactly when the singer starts the highlighted line.</p>
+            <p><strong style="color: #007bff;">RELEASE YOUR SPACEBAR</strong> when the line is finished; synced lines turn <span style="color: #28a745; font-weight: bold;">green</span>.</p>
+            <p><strong style="color: #fd7e14;">Need to fix a mistake?</strong> Press <strong>DELETE</strong> to undo the current line, or use the <strong>Reset All</strong> button.</p>
+            <p>Files save automatically after the last line is synced.</p>
             
             {% if blank_lines_removed and blank_lines_removed > 0 %}
             <p style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin-top: 10px;">
                 <strong>Note:</strong> {{ blank_lines_removed }} blank line{% if blank_lines_removed > 1 %}s were{% else %} was{% endif %} removed from the lyrics file for better syncing accuracy.
             </p>
             {% endif %}
+            <div id="capture-indicator">Spacebar held — capturing this line…</div>
         </div>
 
         <div id="waveform-container">
-            <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn">Back</a>
+            <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn" title="Return to the start page">Home</a>
             <button id="play-pause-btn" class="waveform-btn">Play</button>
+            <button id="reset-btn" class="waveform-btn" title="Clear all timestamps and start over">Reset All</button>
             <div id="waveform"></div>
         </div>
 
@@ -211,12 +238,14 @@
         wavesurfer.load("{{ url_for('upload.serve_audio', filename=audio_file) }}");
 
         const playPauseBtn = document.getElementById('play-pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const captureIndicator = document.getElementById('capture-indicator');
         const lines = document.querySelectorAll('.line');
-        const resetLink = document.getElementById('reset-link');
         const actionsContainer = document.getElementById('actions-container');
         const timestamps = new Array(lines.length).fill(null);
         let activeLineIndex = 0;
         let spacebarDown = false;
+        let pressStartTime = null;
 
         function setActiveLine(index) {
             lines.forEach((line, i) => {
@@ -337,15 +366,23 @@
         document.addEventListener('keydown', function (e) {
             if (e.code === 'Space') {
                 e.preventDefault();
-                if (!spacebarDown) {
+                if (e.repeat) return;
+                if (!spacebarDown && activeLineIndex < lines.length) {
                     spacebarDown = true;
+                    pressStartTime = wavesurfer.getCurrentTime();
+                    timestamps[activeLineIndex] = pressStartTime;
+                    lines[activeLineIndex].classList.add('pressing');
+                    captureIndicator.classList.add('active');
                 }
             } else if (e.code === 'Delete' || e.code === 'Backspace') {
                 e.preventDefault();
                 if (activeLineIndex > 0) {
                     activeLineIndex--;
                     timestamps[activeLineIndex] = null;
-                    lines[activeLineIndex].classList.remove('synced');
+                    lines[activeLineIndex].classList.remove('synced', 'pressing');
+                    captureIndicator.classList.remove('active');
+                    spacebarDown = false;
+                    pressStartTime = null;
                     setActiveLine(activeLineIndex);
                     actionsContainer.innerHTML = ''; // Clear post-save buttons if user goes back
                 }
@@ -357,8 +394,9 @@
                 e.preventDefault();
                 if (spacebarDown) {
                     spacebarDown = false;
+                    captureIndicator.classList.remove('active');
                     if (activeLineIndex < lines.length) {
-                        timestamps[activeLineIndex] = wavesurfer.getCurrentTime();
+                        lines[activeLineIndex].classList.remove('pressing');
                         lines[activeLineIndex].classList.add('synced');
 
                         if (activeLineIndex < lines.length - 1) {
@@ -374,12 +412,15 @@
             }
         });
 
-        resetLink.addEventListener('click', (e) => {
+        resetBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (confirm('Are you sure you want to reset all timestamps?')) {
                 timestamps.fill(null);
-                lines.forEach(line => line.classList.remove('synced'));
+                lines.forEach(line => line.classList.remove('synced', 'pressing', 'active'));
                 activeLineIndex = 0;
+                spacebarDown = false;
+                pressStartTime = null;
+                captureIndicator.classList.remove('active');
                 setActiveLine(0);
                 wavesurfer.seekTo(0);
                 wavesurfer.pause();
