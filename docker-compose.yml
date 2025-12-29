@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/pexus/synced-lyrics-generator:latest
+    build: .
+    container_name: synced-lyrics
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+    restart: unless-stopped

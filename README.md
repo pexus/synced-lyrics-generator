@@ -111,6 +111,19 @@ The app auto-loads `/app/data/.env` if it exists. To use the sample values:
 cp env.sample ./data/.env
 ```
 
+### Docker Compose (recommended)
+
+```bash
+mkdir -p data storage
+cp env.sample ./data/.env
+docker compose up -d
+```
+
+To stop:
+```bash
+docker compose down
+```
+
 ## GitHub Container Registry (GHCR)
 
 A GitHub Actions workflow is included to build and publish images to GHCR on every push to `main`.
@@ -141,6 +154,15 @@ docker run -d --name synced-lyrics \
 ```
 
 Store your environment values in `/opt/synced-lyrics/data/.env` so the container picks them up.
+
+You can also use Docker Compose on the VPS (clone the repo to get `docker-compose.yml`):
+```bash
+cd /opt/synced-lyrics
+mkdir -p data storage
+cp env.sample /opt/synced-lyrics/data/.env
+docker compose pull
+docker compose up -d
+```
 
 2) Apache reverse proxy setup (Ubuntu example):
 ```bash
