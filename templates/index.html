@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synced Lyrics Generator</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
@@ -18,6 +19,32 @@
             padding: 2em; 
             border-radius: 8px; 
             box-shadow: 0 2px 15px rgba(0,0,0,0.05); 
+        }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1em;
+            flex-wrap: wrap;
+            margin-bottom: 1.5em;
+        }
+        .user-email {
+            font-weight: 600;
+            color: #495057;
+        }
+        .user-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            flex-wrap: wrap;
+        }
+        .quota-banner {
+            margin: 1em 0;
+            padding: 0.75em 1em;
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 6px;
+            color: #856404;
         }
         h1, h2 { 
             color: #333;
@@ -276,17 +303,42 @@
 </head>
 <body>
     <div class="container">
+        {% set at_limit = max_tracks is not none and track_count >= max_tracks %}
+        <div class="top-bar">
+            <div class="user-email">Signed in as {{ current_user.email }}</div>
+            <div class="user-actions">
+                {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Admin</a>
+                {% endif %}
+                <a href="{{ url_for('auth.account_security') }}" class="btn btn-secondary">Security</a>
+                <form action="{{ url_for('auth.logout') }}" method="post" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Logout</button>
+                </form>
+            </div>
+        </div>
+
         <h1>Synced Lyrics Generator</h1>
+
+        {% if max_tracks is not none %}
+        <div class="quota-banner">
+            <strong>Track quota:</strong> {{ track_count }} / {{ max_tracks }}
+            {% if at_limit %}
+                — You have reached the limit. Delete a track to upload another.
+            {% endif %}
+        </div>
+        {% endif %}
 
         <div class="upload-section">
             <h2>Upload New Song</h2>
             <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="upload-area">
                     <div class="form-group">
                         <label for="audio-file-input">Audio File (.mp3, .wav)</label>
                         <div class="file-input-wrapper">
                             <label for="audio-file-input" class="btn btn-secondary">Browse...</label>
-                            <input type="file" id="audio-file-input" name="audio" accept=".mp3,.wav" required>
+                            <input type="file" id="audio-file-input" name="audio_file" accept=".mp3,.wav" {% if at_limit %}disabled{% endif %} required>
                             <span id="audio-file-name" class="file-name">No file selected.</span>
                         </div>
                     </div>
@@ -294,13 +346,13 @@
                         <label for="lyrics-file-input">Lyrics File (.txt)</label>
                         <div class="file-input-wrapper">
                             <label for="lyrics-file-input" class="btn btn-secondary">Browse...</label>
-                            <input type="file" id="lyrics-file-input" name="lyrics" accept=".txt" required>
+                            <input type="file" id="lyrics-file-input" name="lyrics_file" accept=".txt" {% if at_limit %}disabled{% endif %} required>
                             <span id="lyrics-file-name" class="file-name">No file selected.</span>
                         </div>
                     </div>
                 </div>
                 <div style="text-align: center;">
-                    <button type="submit" id="upload-btn" class="btn disabled" disabled>Upload Song</button>
+                    <button type="submit" id="upload-btn" class="btn disabled" disabled {% if at_limit %}disabled{% endif %}>Upload Song</button>
                 </div>
             </form>
         </div>
@@ -313,8 +365,9 @@
             <span class="song-title">{{ status.basename }}</span>
             <div class="song-actions">
                 <form action="/upload_lyrics_for/{{ status.basename }}" method="post" enctype="multipart/form-data" style="display: inline-block;" class="upload-lyrics-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label for="lyrics-upload-{{ status.basename }}" class="btn btn-primary">Browse/Upload Lyrics</label>
-                    <input type="file" name="lyrics_file" id="lyrics-upload-{{ status.basename }}" style="display: none;" onchange="this.form.submit()">
+                    <input type="file" name="lyrics_file" id="lyrics-upload-{{ status.basename }}" accept=".txt" style="display: none;" onchange="this.form.submit()">
                 </form>
 
                 {% if status.has_lyrics %}
@@ -328,8 +381,8 @@
                     <a href="/editor/{{ status.audio }}/{{ status.basename }}.txt" class="btn btn-warning">Generate</a>
                 {% endif %}
 
-                {% set lrc_file_exists = (status.basename + '.lrc') | file_exists(config.LRC_OUTPUT_FOLDER) %}
-                {% set srt_file_exists = (status.basename + '.srt') | file_exists(config.SRT_OUTPUT_FOLDER) %}
+                {% set lrc_file_exists = status.lrc_exists %}
+                {% set srt_file_exists = status.srt_exists %}
                 
                 <a href="{{ url_for('files.debug_lrc', basename=status.basename) }}" 
                    class="btn {% if lrc_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
@@ -392,18 +445,22 @@
     </div>
 
     <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
         // Debug helper
         function logToConsole(message) {
             console.log("DEBUG: " + message);
         }
         
+        const uploadLimitReached = {{ 'true' if at_limit else 'false' }};
+
         // Function to check if both files are selected and enable/disable the upload button
         function checkFilesAndToggleButton() {
             const audioFile = document.getElementById('audio-file-input').files[0];
             const lyricsFile = document.getElementById('lyrics-file-input').files[0];
             const uploadBtn = document.getElementById('upload-btn');
             
-            if (audioFile && lyricsFile) {
+            if (audioFile && lyricsFile && !uploadLimitReached) {
                 uploadBtn.classList.remove('disabled');
                 uploadBtn.disabled = false;
             } else {
@@ -435,12 +492,6 @@
                 e.preventDefault();
                 return false;
             }
-            
-            // Rename form fields to match backend expectations
-            const audioInput = document.getElementById('audio-file-input');
-            const lyricsInput = document.getElementById('lyrics-file-input');
-            audioInput.name = 'audio_file';
-            lyricsInput.name = 'lyrics_file';
             
             // Show loading state on button
             const uploadBtn = document.getElementById('upload-btn');
@@ -533,7 +584,8 @@
                 fetch(`/delete_song/${basename}`, { 
                     method: 'DELETE',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
                     }
                 })
                 .then(response => response.json())

@@ -35,6 +35,9 @@ lyrics_input/*
 lrc_output/*
 srt_output/*
 processed_files.txt
+data/
+storage/
+.env
 
 # Keep placeholder files to preserve directory structure
 !audio_input/README.md

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Synced Lyrics</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 2em auto;
+            padding: 2em;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5em;
+            gap: 1em;
+            flex-wrap: wrap;
+        }
+        .btn {
+            text-decoration: none;
+            color: white;
+            background-color: #007bff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95em;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-warning {
+            background-color: #fd7e14;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .section {
+            margin-top: 2em;
+        }
+        .section h2 {
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 0.4em;
+        }
+        .form-row {
+            display: flex;
+            gap: 1em;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 200px;
+        }
+        input, select {
+            padding: 0.6em 0.8em;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+        th, td {
+            padding: 0.75em;
+            border-bottom: 1px solid #dee2e6;
+            text-align: left;
+        }
+        .flash {
+            padding: 0.75em 1em;
+            border-radius: 6px;
+            margin-bottom: 1em;
+        }
+        .flash.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .flash.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .flash.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .badge {
+            padding: 0.2em 0.5em;
+            border-radius: 4px;
+            background: #e9ecef;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <div>Signed in as {{ current_user.email }}</div>
+            <div style="display: flex; gap: 0.5em; flex-wrap: wrap;">
+                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Home</a>
+                <a href="{{ url_for('auth.account_security') }}" class="btn btn-secondary">Security</a>
+                <form action="{{ url_for('auth.logout') }}" method="post" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Logout</button>
+                </form>
+            </div>
+        </div>
+
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+
+        <div class="section">
+            <h2>Invite user</h2>
+            <form action="{{ url_for('admin.create_invite') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select name="role">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Invite valid (days)</label>
+                        <input type="number" name="days_valid" value="7" min="1">
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button class="btn btn-success" type="submit">Send invite</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Settings</h2>
+            <form action="{{ url_for('admin.update_settings') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Max tracks per user</label>
+                        <input type="number" name="max_tracks" value="{{ max_tracks }}" min="1" required>
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button class="btn" type="submit">Update</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Users</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>MFA</th>
+                        <th>Tracks</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.email }}</td>
+                        <td><span class="badge">{{ 'admin' if user.is_admin else 'user' }}</span></td>
+                        <td>{{ 'enabled' if user.mfa_enabled else 'off' }}</td>
+                        <td>{{ track_counts.get(user.id, 0) }}</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Invites</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Expires</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invite in invites %}
+                    <tr>
+                        <td>{{ invite.email }}</td>
+                        <td>
+                            {% if invite.used_at %}
+                                used
+                            {% elif invite.expires_at < current_time %}
+                                expired
+                            {% else %}
+                                active
+                            {% endif %}
+                        </td>
+                        <td>{{ invite.expires_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <form action="{{ url_for('admin.resend_invite', invite_id=invite.id) }}" method="post" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-secondary" type="submit">Resend</button>
+                            </form>
+                            <form action="{{ url_for('admin.revoke_invite', invite_id=invite.id) }}" method="post" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-warning" type="submit">Revoke</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

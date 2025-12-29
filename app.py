@@ -1,10 +1,46 @@
-from flask import Flask
-from routes import register_blueprints
+import datetime
 import logging
 import os
-import datetime
+
+from dotenv import load_dotenv
+from flask import Flask
+
+from extensions import csrf, db, login_manager
+from models import User
+from routes import register_blueprints
+from utils.settings import ensure_setting
+
+load_dotenv()
 
 app = Flask(__name__)
+
+# Configuration
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(BASE_DIR, 'data')
+STORAGE_ROOT = os.environ.get('STORAGE_ROOT') or os.path.join(BASE_DIR, 'storage')
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(STORAGE_ROOT, exist_ok=True)
+
+load_dotenv(dotenv_path=os.path.join(DATA_DIR, '.env'), override=False)
+
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or f"sqlite:///{os.path.join(DATA_DIR, 'app.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['STORAGE_ROOT'] = STORAGE_ROOT
+app.config['PUBLIC_BASE_URL'] = os.environ.get('PUBLIC_BASE_URL', 'http://localhost:5000')
+app.config['MAX_TRACKS_PER_USER_DEFAULT'] = int(os.environ.get('MAX_TRACKS_PER_USER', '20'))
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+app.config['MFA_ISSUER'] = os.environ.get('MFA_ISSUER', 'Synced Lyrics Generator')
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+app.logger.setLevel(logging.INFO)
+
+# Register the timestamp_to_datetime Jinja filter
+@app.template_filter('timestamp_to_datetime')
+def timestamp_to_datetime(timestamp):
+    return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 
 # Register the file_exists Jinja filter
 @app.template_filter('file_exists')
@@ -12,33 +48,27 @@ def file_exists_filter(filename, folder):
     filepath = os.path.join(folder, filename)
     return os.path.exists(filepath) and os.path.getsize(filepath) > 0
 
-# Register the timestamp_to_datetime Jinja filter
-@app.template_filter('timestamp_to_datetime')
-def timestamp_to_datetime(timestamp):
-    return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-app.logger.setLevel(logging.DEBUG)
+def init_extensions():
+    db.init_app(app)
+    login_manager.init_app(app)
+    csrf.init_app(app)
 
-# Configuration
-AUDIO_INPUT_FOLDER = 'audio_input'
-LYRICS_INPUT_FOLDER = 'lyrics_input'
-LRC_OUTPUT_FOLDER = 'lrc_output'
-SRT_OUTPUT_FOLDER = 'srt_output'
-PROCESSED_FILES_DB = 'processed_files.txt'
 
-app.config['AUDIO_INPUT_FOLDER'] = AUDIO_INPUT_FOLDER
-app.config['LYRICS_INPUT_FOLDER'] = LYRICS_INPUT_FOLDER
-app.config['LRC_OUTPUT_FOLDER'] = LRC_OUTPUT_FOLDER
-app.config['SRT_OUTPUT_FOLDER'] = SRT_OUTPUT_FOLDER
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
-# Create folders if they don't exist
-for folder in [AUDIO_INPUT_FOLDER, LYRICS_INPUT_FOLDER, LRC_OUTPUT_FOLDER, SRT_OUTPUT_FOLDER, os.path.join('static', 'audio')]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
 
+login_manager.login_view = 'auth.login'
+login_manager.login_message_category = 'info'
+
+init_extensions()
 register_blueprints(app)
+
+with app.app_context():
+    db.create_all()
+    ensure_setting('max_tracks_per_user', app.config['MAX_TRACKS_PER_USER_DEFAULT'])
 
 if __name__ == '__main__':
     app.run(debug=True)
