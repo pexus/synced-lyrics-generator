@@ -106,6 +106,10 @@
             background: #e9ecef;
             font-size: 0.85em;
         }
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -179,6 +183,7 @@
                         <th>MFA</th>
                         <th>Tracks</th>
                         <th>Created</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -189,6 +194,16 @@
                         <td>{{ 'enabled' if user.mfa_enabled else 'off' }}</td>
                         <td>{{ track_counts.get(user.id, 0) }}</td>
                         <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if user.id != current_user.id %}
+                            <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" method="post" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this user and all uploaded files?')">Delete</button>
+                            </form>
+                            {% else %}
+                                <span class="badge">current</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -223,11 +238,15 @@
                         <td>
                             <form action="{{ url_for('admin.resend_invite', invite_id=invite.id) }}" method="post" style="display: inline;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-secondary" type="submit">Resend</button>
+                                <button class="btn btn-secondary btn-sm" type="submit">Resend</button>
                             </form>
                             <form action="{{ url_for('admin.revoke_invite', invite_id=invite.id) }}" method="post" style="display: inline;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-warning" type="submit">Revoke</button>
+                                <button class="btn btn-warning btn-sm" type="submit">Revoke</button>
+                            </form>
+                            <form action="{{ url_for('admin.delete_invite', invite_id=invite.id) }}" method="post" style="display: inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete this invite?')">Delete</button>
                             </form>
                         </td>
                     </tr>

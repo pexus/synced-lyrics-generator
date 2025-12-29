@@ -1,4 +1,6 @@
+import os
 import secrets
+import shutil
 from datetime import datetime
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
@@ -10,6 +12,7 @@ from models import Invite, Track, User
 from utils.auth import admin_required
 from utils.email_utils import send_invite_email
 from utils.settings import get_int_setting, set_setting
+from utils.storage import get_user_root
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -119,6 +122,44 @@ def revoke_invite(invite_id):
     invite.used_at = datetime.utcnow()
     db.session.commit()
     flash('Invite revoked.', 'success')
+    return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route('/admin/invite/<int:invite_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_invite(invite_id):
+    invite = Invite.query.get_or_404(invite_id)
+    db.session.delete(invite)
+    db.session.commit()
+    flash('Invite deleted.', 'success')
+    return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route('/admin/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    if user_id == current_user.id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('admin.dashboard'))
+
+    user = User.query.get_or_404(user_id)
+    user_root = get_user_root(user.id)
+
+    try:
+        if os.path.exists(user_root):
+            shutil.rmtree(user_root)
+    except OSError as exc:
+        flash(f'Failed to remove user files: {exc}', 'error')
+        return redirect(url_for('admin.dashboard'))
+
+    Track.query.filter_by(user_id=user.id).delete()
+    Invite.query.filter_by(email=user.email).delete()
+    db.session.delete(user)
+    db.session.commit()
+
+    flash('User deleted.', 'success')
     return redirect(url_for('admin.dashboard'))
 
 
