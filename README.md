@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 4. Configure environment variables (local example):
 ```bash
-cp .env.sample .env
+cp env.sample .env
 # edit .env with your values
 ```
 
@@ -108,7 +108,7 @@ docker run -p 5000:5000 \
 
 The app auto-loads `/app/data/.env` if it exists. To use the sample values:
 ```bash
-cp .env.sample ./data/.env
+cp env.sample ./data/.env
 ```
 
 ## GitHub Container Registry (GHCR)
