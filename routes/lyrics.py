@@ -28,8 +28,15 @@ def editor(audio_file, lyrics_file):
     if not os.path.exists(lyrics_path):
         return "Lyrics file not found.", 404
 
-    with open(lyrics_path, 'r') as f:
-        all_lines = f.read().splitlines()
+    with open(lyrics_path, 'rb') as f:
+        raw_bytes = f.read()
+    try:
+        text = raw_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+        text = raw_bytes.decode('cp1252')
+        with open(lyrics_path, 'w', encoding='utf-8') as f:
+            f.write(text)
+    all_lines = text.splitlines()
 
     lyrics_lines = [line for line in all_lines if line.strip()]
     blank_lines_count = len(all_lines) - len(lyrics_lines)
