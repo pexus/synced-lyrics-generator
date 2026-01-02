@@ -13,11 +13,15 @@ A web-based tool to create, manage, and edit synchronized lyrics files (LRC and 
 - Browser-based editor for synchronized lyrics
 - Generate both LRC and SRT format synchronized lyrics files
 - View and download the generated files directly from the browser
+- AI First Pass transcription + alignment (OpenAI Whisper) with a review UI
+- Optional vocal stem input for AI runs
+- Separate manual vs AI outputs (LRC/SRT)
 
 ## Prerequisites
 
 - Python 3.9+
 - SQLite (default)
+- ffmpeg (required for AI transcription when audio exceeds API limits)
 
 ## Installation
 
@@ -82,6 +86,7 @@ python app.py
 - `STORAGE_ROOT`: Base directory for per-user files (optional).
 - `SMTP_*`: SMTP server settings for invite emails.
 - `MFA_ISSUER`: Optional label shown in authenticator apps.
+- `OPENAI_API_KEY`: Required to use AI First Pass.
 
 ## Per-user Storage Layout
 
@@ -89,10 +94,30 @@ python app.py
 storage/
   user_<id>/
     audio_input/
+    vocal_input/
     lyrics_input/
+    ai_drafts/
     lrc_output/
     srt_output/
+    ai_lrc_output/
+    ai_srt_output/
 ```
+
+Manual outputs are saved under `lrc_output/` and `srt_output/`. AI outputs are saved separately under `ai_lrc_output/` and `ai_srt_output/`.
+
+## AI First Pass (Optional)
+
+The AI flow generates a draft SRT/LRC using OpenAI Whisper and then lets you review and correct timestamps.
+
+1. Upload an audio file and a lyrics `.txt` file.
+2. (Optional) Upload a vocal stem for the same track.
+3. Click **Generate using AI** in the library.
+4. Choose whether to use the vocal stem, then start the run.
+5. Review and refine the AI draft in the AI Review page.
+
+Notes:
+- Use romanized (Latin letters) lyrics for the best alignment.
+- Vocal stems can help some tracks, but full mixes may work better depending on the song.
 
 ## Docker
 
