@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ 'Manual Review' if has_manual_sync else 'Generate Manually' }}</title>
+    <title>
+        {% if manual_source_label %}
+            Manual Review ({{ manual_source_label }})
+        {% elif has_manual_sync %}
+            Manual Review
+        {% else %}
+            Generate Manually
+        {% endif %}
+    </title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://unpkg.com/wavesurfer.js"></script>
     <style>
@@ -148,6 +156,14 @@
             background: #bd2130;
         }
 
+        #load-ai-btn {
+            background: #0d6efd;
+        }
+
+        #load-ai-btn:hover {
+            background: #0b5ed7;
+        }
+
         #waveform {
             width: 100%;
         }
@@ -276,7 +292,15 @@
 
 <body>
     <div class="container">
-        <h2 class="page-title">{{ 'Manual Review' if has_manual_sync else 'Generate Manually' }}</h2>
+        <h2 class="page-title">
+            {% if manual_source_label %}
+                Manual Review ({{ manual_source_label }})
+            {% elif has_manual_sync %}
+                Manual Review
+            {% else %}
+                Generate Manually
+            {% endif %}
+        </h2>
         <div class="instructions">
             <p><strong style="color: #28a745;">Press Play</strong> to start the audio, then</p>
             <p><strong style="color: #007bff;">HOLD YOUR SPACEBAR DOWN</strong> exactly when the singer starts the highlighted line.</p>
@@ -284,6 +308,9 @@
             <p>Start and end times fill in on each line as you capture.</p>
             <p>Click a line to jump playback to its start time and continue from there.</p>
             <p>Use the slider under the waveform to scrub forward or backward.</p>
+            {% if manual_source_label %}
+            <p>Loaded from {{ manual_source_label }}. You can refine and save as manual output.</p>
+            {% endif %}
             <p><strong style="color: #fd7e14;">Need to fix a mistake?</strong> Press <strong>DELETE</strong> to undo the current line, or use the <strong>Reset All</strong> button.</p>
             <p>Files save automatically after the last line is synced.</p>
             
@@ -300,6 +327,9 @@
                 <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn" title="Return to the start page">Home</a>
                 <button id="play-pause-btn" class="waveform-btn">Play</button>
                 <button id="reset-btn" class="waveform-btn" title="Clear all timestamps and start over">Reset All</button>
+                {% if ai_draft_available and not ai_draft_loaded %}
+                    <a href="{{ url_for('lyrics.editor', audio_file=audio_file, lyrics_file=lyrics_file, source='ai') }}" id="load-ai-btn" class="waveform-btn">Load AI Draft</a>
+                {% endif %}
             </div>
             <div class="status">
                 <span>Current Time:</span>

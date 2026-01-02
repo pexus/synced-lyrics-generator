@@ -409,7 +409,11 @@
                 </form>
 
                 {% if status.has_lyrics %}
-                    <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">Manual Review</a>
+                    {% if status.srt_exists %}
+                        <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">Manual Review</a>
+                    {% elif status.ai_draft_exists %}
+                        <a href="/editor/{{ status.audio }}/{{ status.lyrics }}?source=ai" class="btn btn-success">Manual Review (AI Draft)</a>
+                    {% endif %}
                     {% if status.is_processed %}
                         <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')">Re-generate Manually</button>
                     {% else %}

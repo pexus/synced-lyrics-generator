@@ -400,6 +400,7 @@
 
         <div class="actions">
             <button class="btn btn-success" id="save-btn">Save AI Draft</button>
+            <a href="{{ url_for('lyrics.editor', audio_file=audio_file, lyrics_file=lyrics_file, source='ai') }}" class="btn">Open in Manual Review</a>
             <button class="btn btn-secondary" id="undo-btn">Undo</button>
             <button class="btn btn-secondary" id="redo-btn">Redo</button>
             <button class="btn btn-secondary" id="reset-btn">Reset to AI Draft</button>

@@ -206,6 +206,7 @@ def editor(basename):
         timestamps=timestamps,
         draft_lyrics_data=lyrics_data,
         draft_meta=draft,
+        lyrics_file=track.lyrics_filename,
         basename=basename,
         blank_lines_removed=blank_lines_count,
         has_draft=bool(draft),
