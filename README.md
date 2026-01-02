@@ -88,6 +88,7 @@ python app.py
 - `SMTP_*`: SMTP server settings for invite emails.
 - `MFA_ISSUER`: Optional label shown in authenticator apps.
 - `OPENAI_API_KEY`: Required to use AI First Pass.
+- `OPENAI_TRANSCRIBE_TIMEOUT`: Optional request timeout (seconds) for AI transcription.
 
 ## Per-user Storage Layout
 

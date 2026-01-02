@@ -132,18 +132,23 @@
         const spinner = document.getElementById('spinner');
         const startBtn = document.getElementById('start-btn');
         const useVocalsToggle = document.getElementById('use-vocals');
+        const vocalOptionAvailable = !useVocalsToggle.disabled;
 
         function showError(message) {
             errorText.style.display = 'block';
             errorText.textContent = message;
             statusText.textContent = 'AI First Pass failed.';
             hintText.textContent = 'Fix the issue and try again from the library.';
+            spinner.classList.add('hidden');
+            startBtn.disabled = false;
+            useVocalsToggle.disabled = !vocalOptionAvailable;
         }
 
         startBtn.addEventListener('click', () => {
             startBtn.disabled = true;
             useVocalsToggle.disabled = true;
             spinner.classList.remove('hidden');
+            errorText.style.display = 'none';
             statusText.textContent = 'Generating AI First Pass…';
             hintText.textContent = 'This can take a minute or two. Please keep this tab open.';
             const useVocals = useVocalsToggle.checked && !useVocalsToggle.disabled;

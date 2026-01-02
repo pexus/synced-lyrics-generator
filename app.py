@@ -33,6 +33,7 @@ app.config['MAX_TRACKS_PER_USER_DEFAULT'] = int(os.environ.get('MAX_TRACKS_PER_U
 app.config['WTF_CSRF_TIME_LIMIT'] = None
 app.config['MFA_ISSUER'] = os.environ.get('MFA_ISSUER', 'Synced Lyrics Generator')
 app.config['OPENAI_API_KEY'] = os.environ.get('OPENAI_API_KEY')
+app.config['OPENAI_TRANSCRIBE_TIMEOUT'] = int(os.environ.get('OPENAI_TRANSCRIBE_TIMEOUT', '300'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

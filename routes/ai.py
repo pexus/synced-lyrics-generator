@@ -108,8 +108,13 @@ def generate_ai_draft(basename):
     prompt = "Transcribe in romanized (Latin) letters. Match the lyrics when possible.\n"
     prompt += "\n".join(prompt_lines)
 
+    timeout_seconds = current_app.config.get('OPENAI_TRANSCRIBE_TIMEOUT', 300)
     try:
-        transcription = transcribe_audio(audio_path, prompt=prompt)
+        transcription = transcribe_audio(
+            audio_path,
+            prompt=prompt,
+            timeout_seconds=timeout_seconds,
+        )
     except TranscriptionError as exc:
         current_app.logger.exception("AI transcription failed.")
         message = f"AI transcription failed: {exc}"

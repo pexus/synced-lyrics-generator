@@ -13,6 +13,7 @@ class TranscriptionError(Exception):
 
 
 MAX_OPENAI_UPLOAD_BYTES = 25 * 1024 * 1024
+DEFAULT_TRANSCRIBE_TIMEOUT = 300
 
 
 def _require_ffmpeg():
@@ -74,7 +75,7 @@ def _split_audio(audio_path, segment_seconds=600):
     return temp_dir, segment_paths
 
 
-def _transcribe_file(audio_path, prompt=None, timeout_seconds=120):
+def _transcribe_file(audio_path, prompt=None, timeout_seconds=DEFAULT_TRANSCRIBE_TIMEOUT):
     api_key = current_app.config.get('OPENAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
     if not api_key:
         raise TranscriptionError('OPENAI_API_KEY is not set.')
@@ -114,7 +115,7 @@ def _transcribe_file(audio_path, prompt=None, timeout_seconds=120):
     return response.json()
 
 
-def transcribe_audio(audio_path, prompt=None, timeout_seconds=120):
+def transcribe_audio(audio_path, prompt=None, timeout_seconds=DEFAULT_TRANSCRIBE_TIMEOUT):
     file_size = os.path.getsize(audio_path)
     if file_size <= MAX_OPENAI_UPLOAD_BYTES:
         return _transcribe_file(audio_path, prompt=prompt, timeout_seconds=timeout_seconds)
