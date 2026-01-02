@@ -13,6 +13,7 @@ A web-based tool to create, manage, and edit synchronized lyrics files (LRC and 
 - Browser-based editor for synchronized lyrics
 - Generate both LRC and SRT format synchronized lyrics files
 - View and download the generated files directly from the browser
+- Optional numbered SRT variant for editors that expect cue indices
 - AI First Pass transcription + alignment (OpenAI Whisper) with a review UI
 - Optional vocal stem input for AI runs
 - Separate manual vs AI outputs (LRC/SRT)
