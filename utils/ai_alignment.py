@@ -67,7 +67,14 @@ def tokenize_lines(lines):
     return tokens, line_spans
 
 
-def find_line_match(line_tokens, transcript_tokens, transcript_words, start_idx, max_window_seconds=90):
+def find_line_match(
+    line_tokens,
+    transcript_tokens,
+    transcript_words,
+    start_idx,
+    max_window_seconds=90,
+    min_required=None,
+):
     if not line_tokens or start_idx >= len(transcript_tokens) or not transcript_words:
         return None
 
@@ -89,7 +96,8 @@ def find_line_match(line_tokens, transcript_tokens, transcript_words, start_idx,
         if t_idx >= end_idx_limit:
             break
 
-    min_required = 1 if len(line_tokens) < 3 else 2
+    if min_required is None:
+        min_required = 1 if len(line_tokens) < 3 else 2
     if len(matched_indices) >= min_required:
         return matched_indices[0], matched_indices[-1]
 
@@ -183,12 +191,13 @@ def interpolate_missing_times(times, max_gap_lines=3):
     return filled
 
 
-def build_line_timings(lines, transcript_words):
+def _build_line_timings(lines, transcript_words, max_window_seconds, min_required):
     transcript_tokens = [normalize_token(word['word']) for word in transcript_words]
 
     line_times = []
     line_end_times = []
     cursor_idx = 0
+    matched_lines = 0
     for line in lines:
         line_tokens = tokenize_line(line)
         if not line_tokens:
@@ -196,7 +205,14 @@ def build_line_timings(lines, transcript_words):
             line_end_times.append(None)
             continue
 
-        match = find_line_match(line_tokens, transcript_tokens, transcript_words, cursor_idx)
+        match = find_line_match(
+            line_tokens,
+            transcript_tokens,
+            transcript_words,
+            cursor_idx,
+            max_window_seconds=max_window_seconds,
+            min_required=min_required,
+        )
         if not match:
             line_times.append(None)
             line_end_times.append(None)
@@ -206,6 +222,7 @@ def build_line_timings(lines, transcript_words):
         line_times.append(transcript_words[first_match]['start'])
         line_end_times.append(transcript_words[last_match]['end'])
         cursor_idx = last_match + 1
+        matched_lines += 1
 
     line_times = interpolate_missing_times(line_times, max_gap_lines=3)
     adjusted_end_times = []
@@ -219,10 +236,28 @@ def build_line_timings(lines, transcript_words):
             continue
         adjusted_end_times.append(end_time)
 
-    return [
+    timings = [
         {
             'time': line_times[index],
             'end_time': adjusted_end_times[index],
         }
         for index in range(len(line_times))
     ]
+    return timings, matched_lines
+
+
+def build_line_timings(lines, transcript_words):
+    timings, matched = _build_line_timings(
+        lines,
+        transcript_words,
+        max_window_seconds=90,
+        min_required=None,
+    )
+    if matched == 0:
+        timings, _ = _build_line_timings(
+            lines,
+            transcript_words,
+            max_window_seconds=180,
+            min_required=1,
+        )
+    return timings
