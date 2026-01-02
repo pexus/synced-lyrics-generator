@@ -56,6 +56,27 @@ def upload_file():
         audio_file.save(audio_path)
         lyrics_file.save(lyrics_path)
 
+        vocal_file = request.files.get('vocal_file')
+        if vocal_file and vocal_file.filename:
+            vocal_filename = secure_filename(vocal_file.filename)
+            if not vocal_filename.lower().endswith(('.mp3', '.wav')):
+                return "Invalid vocal stem type. Please use MP3 or WAV files.", 400
+            _, ext = os.path.splitext(vocal_filename)
+            for stem_ext in ('.mp3', '.wav'):
+                existing = build_user_path(
+                    current_user.id,
+                    'vocal_input',
+                    f'{base_name}_vocals{stem_ext}'
+                )
+                if os.path.exists(existing):
+                    os.remove(existing)
+            vocal_path = build_user_path(
+                current_user.id,
+                'vocal_input',
+                f'{base_name}_vocals{ext.lower()}'
+            )
+            vocal_file.save(vocal_path)
+
         track = Track(
             user_id=current_user.id,
             basename=base_name,
@@ -92,6 +113,41 @@ def upload_lyrics_for(basename):
     return redirect(url_for('main.index'))
 
 
+@upload_bp.route('/upload_vocals_for/<basename>', methods=['POST'])
+@login_required
+def upload_vocals_for(basename):
+    ensure_user_dirs(current_user.id)
+
+    track = Track.query.filter_by(user_id=current_user.id, basename=basename).first()
+    if not track:
+        return "Track not found.", 404
+
+    if 'vocal_file' in request.files:
+        file = request.files['vocal_file']
+        if file.filename != '':
+            if not file.filename.lower().endswith(('.mp3', '.wav')):
+                return "Invalid vocal stem type. Please use MP3 or WAV files.", 400
+            filename = secure_filename(file.filename)
+            _, ext = os.path.splitext(filename)
+            for stem_ext in ('.mp3', '.wav'):
+                existing = build_user_path(
+                    current_user.id,
+                    'vocal_input',
+                    f'{track.basename}_vocals{stem_ext}'
+                )
+                if os.path.exists(existing):
+                    os.remove(existing)
+            file.save(
+                build_user_path(
+                    current_user.id,
+                    'vocal_input',
+                    f'{track.basename}_vocals{ext.lower()}'
+                )
+            )
+
+    return redirect(url_for('main.index'))
+
+
 @upload_bp.route('/serve_audio/<filename>')
 @login_required
 def serve_audio(filename):
@@ -113,9 +169,14 @@ def delete_song(basename):
 
     paths_to_delete = [
         build_user_path(current_user.id, 'audio_input', track.audio_filename),
+        build_user_path(current_user.id, 'vocal_input', track.basename + '_vocals.wav'),
+        build_user_path(current_user.id, 'vocal_input', track.basename + '_vocals.mp3'),
         build_user_path(current_user.id, 'lyrics_input', track.lyrics_filename),
         build_user_path(current_user.id, 'lrc_output', track.basename + '.lrc'),
         build_user_path(current_user.id, 'srt_output', track.basename + '.srt'),
+        build_user_path(current_user.id, 'ai_drafts', track.basename + '.json'),
+        build_user_path(current_user.id, 'ai_lrc_output', track.basename + '.lrc'),
+        build_user_path(current_user.id, 'ai_srt_output', track.basename + '.srt'),
     ]
 
     for path in paths_to_delete:

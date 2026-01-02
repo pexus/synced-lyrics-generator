@@ -5,9 +5,13 @@ from flask import current_app
 
 USER_FOLDERS = (
     'audio_input',
+    'vocal_input',
     'lyrics_input',
     'lrc_output',
     'srt_output',
+    'ai_drafts',
+    'ai_lrc_output',
+    'ai_srt_output',
 )
 
 

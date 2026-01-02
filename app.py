@@ -32,6 +32,7 @@ app.config['PUBLIC_BASE_URL'] = os.environ.get('PUBLIC_BASE_URL', 'http://localh
 app.config['MAX_TRACKS_PER_USER_DEFAULT'] = int(os.environ.get('MAX_TRACKS_PER_USER', '20'))
 app.config['WTF_CSRF_TIME_LIMIT'] = None
 app.config['MFA_ISSUER'] = os.environ.get('MFA_ISSUER', 'Synced Lyrics Generator')
+app.config['OPENAI_API_KEY'] = os.environ.get('OPENAI_API_KEY')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

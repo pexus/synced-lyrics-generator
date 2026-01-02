@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI First Pass Processing</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 720px;
+            margin: 10vh auto;
+            background: white;
+            padding: 2.5em;
+            border-radius: 12px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+        .spinner {
+            width: 56px;
+            height: 56px;
+            border: 6px solid #e9ecef;
+            border-top-color: #17a2b8;
+            border-radius: 50%;
+            margin: 0 auto 1.5em;
+            animation: spin 1s linear infinite;
+        }
+        .spinner.hidden {
+            display: none;
+        }
+        .status {
+            font-size: 1.1em;
+            margin-bottom: 0.75em;
+        }
+        .hint {
+            color: #6c757d;
+            font-size: 0.95em;
+        }
+        .options {
+            margin-top: 1.25em;
+            text-align: left;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1em 1.25em;
+        }
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6em;
+            font-size: 1em;
+            color: #333;
+        }
+        .option-hint {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 0.5em;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: 600;
+            margin-top: 1em;
+        }
+        .actions {
+            margin-top: 1.5em;
+            display: flex;
+            justify-content: center;
+            gap: 0.75em;
+            flex-wrap: wrap;
+        }
+        .btn {
+            text-decoration: none;
+            color: white;
+            background-color: #6c757d;
+            padding: 10px 16px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95em;
+            display: inline-block;
+        }
+        .btn:hover {
+            background-color: #5a6268;
+        }
+        .btn-primary {
+            background-color: #17a2b8;
+        }
+        .btn-primary:hover {
+            background-color: #138496;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner hidden" id="spinner"></div>
+        <div class="status" id="status-text">Ready to generate AI First Pass.</div>
+        <div class="hint" id="hint-text">Choose whether to use the vocal stem, then start the run.</div>
+        <div class="options">
+            <div class="option-row">
+                <input type="checkbox" id="use-vocals" {% if vocal_available %}checked{% else %}disabled{% endif %}>
+                <label for="use-vocals">Use vocal stem (if available)</label>
+            </div>
+            <div class="option-hint">
+                {% if vocal_available %}
+                    Using a stem can help when the vocal is clear, but it may also reduce context in some songs.
+                {% else %}
+                    No vocal stem uploaded for this track.
+                {% endif %}
+            </div>
+        </div>
+        <div class="error" id="error-text" style="display:none;"></div>
+        <div class="actions">
+            <button id="start-btn" class="btn btn-primary">Start AI First Pass</button>
+            <a href="{{ url_for('main.index') }}" class="btn">Back to Library</a>
+        </div>
+    </div>
+
+    <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const statusText = document.getElementById('status-text');
+        const hintText = document.getElementById('hint-text');
+        const errorText = document.getElementById('error-text');
+        const spinner = document.getElementById('spinner');
+        const startBtn = document.getElementById('start-btn');
+        const useVocalsToggle = document.getElementById('use-vocals');
+
+        function showError(message) {
+            errorText.style.display = 'block';
+            errorText.textContent = message;
+            statusText.textContent = 'AI First Pass failed.';
+            hintText.textContent = 'Fix the issue and try again from the library.';
+        }
+
+        startBtn.addEventListener('click', () => {
+            startBtn.disabled = true;
+            useVocalsToggle.disabled = true;
+            spinner.classList.remove('hidden');
+            statusText.textContent = 'Generating AI First Pass…';
+            hintText.textContent = 'This can take a minute or two. Please keep this tab open.';
+            const useVocals = useVocalsToggle.checked && !useVocalsToggle.disabled;
+            const url = "{{ url_for('ai.generate_ai_draft', basename=basename) }}" + `?use_vocals=${useVocals ? '1' : '0'}`;
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.redirect) {
+                    window.location.href = data.redirect;
+                    return;
+                }
+                showError(data.message || 'Unknown error while generating AI draft.');
+            })
+            .catch(error => {
+                console.error('AI draft generation failed:', error);
+                showError('Network error while generating AI draft.');
+            })
+            .finally(() => {
+                startBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>

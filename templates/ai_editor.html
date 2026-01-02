@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lyrics Review</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="https://unpkg.com/wavesurfer.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 2em;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            background: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+        }
+        .instructions {
+            margin-bottom: 1.5em;
+            padding: 1em;
+            background: #f1f3f5;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .instructions p {
+            margin: 0.5em 0;
+            font-size: 1.05em;
+            color: #555;
+        }
+        #waveform-container {
+            display: block;
+            margin: 0.5em 0 1em;
+        }
+        .waveform-btn {
+            color: white;
+            text-decoration: none;
+            border: none;
+            border-radius: 5px;
+            padding: 0.85em 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            min-width: 110px;
+            flex-shrink: 0;
+            text-align: center;
+            font-size: 0.95em;
+            transition: background-color 0.2s;
+        }
+        #play-pause-btn {
+            background: #28a745;
+        }
+        #play-pause-btn:hover {
+            background: #218838;
+        }
+        #set-time-btn {
+            background: #17a2b8;
+        }
+        #set-time-btn:hover {
+            background: #138496;
+        }
+        #line-capture-btn {
+            background: #ff6f61;
+            width: auto;
+            padding: 0.9em 1.5em;
+        }
+        #line-capture-btn.active {
+            background: #e05749;
+        }
+        #restart-btn {
+            background: #6f42c1;
+        }
+        #restart-btn:hover {
+            background: #5a32a3;
+        }
+        #back-btn {
+            background: #6c757d;
+        }
+        #back-btn:hover {
+            background: #5a6268;
+        }
+        #waveform {
+            flex-grow: 1;
+            width: 100%;
+        }
+        .seek-bar {
+            margin-top: 0.5em;
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+        }
+        .seek-bar input[type="range"] {
+            width: 100%;
+            accent-color: #17a2b8;
+        }
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1em;
+            flex-wrap: wrap;
+            margin-bottom: 0.75em;
+        }
+        .capture-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+            flex-wrap: wrap;
+            margin-bottom: 1em;
+        }
+        .transport,
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+            flex-wrap: wrap;
+        }
+        .status .current-time {
+            font-weight: 600;
+        }
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.4em;
+            font-size: 0.9em;
+            color: #495057;
+        }
+        .preview-toggle {
+            background-color: #6c757d;
+        }
+        .preview-toggle.active {
+            background-color: #495057;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5em;
+        }
+        .layout.with-preview {
+            grid-template-columns: 2fr 1fr;
+        }
+        .panel {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1em;
+            background: #fff;
+        }
+        .panel h3 {
+            margin-top: 0;
+            margin-bottom: 0.8em;
+            font-size: 1.1em;
+        }
+        #lyrics-container {
+            max-height: 45vh;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .line {
+            display: grid;
+            grid-template-columns: 160px 1fr 160px;
+            gap: 0.6em;
+            padding: 8px 10px;
+            border-bottom: 1px solid #e9ecef;
+            align-items: center;
+            font-size: 0.95em;
+        }
+        .line:last-child {
+            border-bottom: none;
+        }
+        .line.active {
+            background-color: #dbe9ff;
+        }
+        .line.selected {
+            border-left: 3px solid #17a2b8;
+            background-color: #e7f6f9;
+        }
+        .time-input,
+        .text-input {
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.95em;
+            width: 100%;
+        }
+        .time-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4em;
+        }
+        .time-group .time-input {
+            flex: 1;
+            min-width: 0;
+        }
+        .time-set-btn {
+            background: #6c757d;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+        .time-set-btn:hover {
+            background: #5a6268;
+        }
+        .offset-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            flex-wrap: wrap;
+        }
+        .offset-controls label {
+            font-size: 0.9em;
+            color: #555;
+        }
+        .offset-controls input {
+            width: 120px;
+            padding: 6px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .offset-controls .btn-secondary {
+            padding: 8px 12px;
+        }
+        .tools {
+            margin: 0 0 1.2em;
+        }
+        .tools summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5em;
+        }
+        .ripple-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.6em;
+            flex-wrap: wrap;
+            margin-top: 0.6em;
+        }
+        .ripple-controls label {
+            display: flex;
+            align-items: center;
+            gap: 0.35em;
+            font-size: 0.9em;
+            color: #495057;
+        }
+        .delta-toast {
+            color: #0f5132;
+            background: #d1e7dd;
+            border: 1px solid #badbcc;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        .current-time {
+            font-weight: 600;
+            color: #333;
+        }
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+            flex-wrap: wrap;
+            margin-top: 1.2em;
+        }
+        .btn {
+            text-decoration: none;
+            color: white;
+            background-color: #007bff;
+            padding: 10px 16px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95em;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .save-status {
+            font-weight: 600;
+            color: #28a745;
+        }
+        #srt-preview {
+            white-space: pre-wrap;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.85em;
+            max-height: 50vh;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 0.75em;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+            .line {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="instructions">
+            <p><strong>AI First Pass Review</strong></p>
+            <p>Click a line to jump playback to that line. Press <strong>Mark Start</strong> to adjust the begin time.</p>
+            <p>Hold <strong>Click to Begin Line</strong> while the line plays, then release to set the end time.</p>
+            <p>Use the <strong>Set</strong> buttons on the start/end columns to stamp the current time.</p>
+            <p>Enable <strong>Auto-advance</strong> to jump to the next line after capture.</p>
+            <p>Timestamps use SRT format <strong>HH:MM:SS,mmm</strong>. Use <strong>Restart</strong> to jump back to the beginning.</p>
+            <p>Pause anytime to edit text or timestamps, then resume playback.</p>
+            {% if blank_lines_removed and blank_lines_removed > 0 %}
+            <p style="background-color: #fff3cd; color: #856404; padding: 8px; border-radius: 4px; margin-top: 10px;">
+                <strong>Note:</strong> {{ blank_lines_removed }} blank line{% if blank_lines_removed > 1 %}s were{% else %} was{% endif %} removed from the lyrics file.
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="toolbar">
+            <div class="transport">
+                <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn">Home</a>
+                <button id="play-pause-btn" class="waveform-btn">Play</button>
+                <button id="restart-btn" class="waveform-btn">Restart</button>
+                <button id="set-time-btn" class="waveform-btn">Mark Start</button>
+                <button id="line-capture-btn" class="waveform-btn">Click to Begin Line</button>
+            </div>
+            <div class="status">
+                <div class="current-time">Current Time: <span id="current-time">00:00:00,000</span></div>
+                {% if has_draft %}
+                <div class="current-time">Draft Loaded</div>
+                {% endif %}
+                <label class="toggle">
+                    Auto-advance
+                    <input type="checkbox" id="auto-advance-toggle" checked>
+                </label>
+                <button id="preview-toggle" class="btn btn-secondary preview-toggle">Show SRT Preview</button>
+            </div>
+        </div>
+
+        <div id="waveform-container">
+            <div id="waveform"></div>
+            <div class="seek-bar">
+                <input type="range" id="seek-slider" min="0" max="1000" step="1" value="0" aria-label="Seek audio">
+            </div>
+        </div>
+
+
+        <details class="tools">
+            <summary>Tools</summary>
+            <div class="offset-controls">
+                <label for="offset-input">Shift all times (sec)</label>
+                <input type="number" id="offset-input" step="0.01" value="0">
+                <button id="apply-offset-btn" class="btn btn-secondary">Apply</button>
+                <button id="auto-offset-btn" class="btn btn-secondary">Set offset from current line</button>
+            </div>
+            <div class="ripple-controls">
+                <label>
+                    <input type="checkbox" id="ripple-toggle">
+                    Ripple forward on edit
+                </label>
+                <span class="delta-toast" id="ripple-toast" style="display:none;"></span>
+            </div>
+        </details>
+
+        <div class="layout" id="layout">
+            <div class="panel">
+                <h3>Lyrics Lines</h3>
+                <div id="lyrics-container"></div>
+            </div>
+            <div class="panel srt-panel" id="srt-panel" style="display: none;">
+                <h3>SRT Preview</h3>
+                <div id="srt-preview">No timestamps yet.</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-success" id="save-btn">Save AI Draft</button>
+            <button class="btn btn-secondary" id="undo-btn">Undo</button>
+            <button class="btn btn-secondary" id="redo-btn">Redo</button>
+            <button class="btn btn-secondary" id="reset-btn">Reset to AI Draft</button>
+            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Back to Library</a>
+            <span class="save-status" id="save-status"></span>
+        </div>
+    </div>
+
+    <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const lyricsLines = {{ lyrics_lines|tojson }};
+        const initialTimes = {{ timestamps|tojson }};
+        const draftLyricsData = {{ draft_lyrics_data|tojson }};
+        const draftMeta = {{ draft_meta|tojson }};
+        const originalLyricsDataSeed = {{ original_lyrics_data|tojson }};
+        const basename = {{ basename|tojson }};
+
+        function normalizeLyricsData(items, fallbackLines, fallbackTimes) {
+            if (Array.isArray(items) && items.length > 0) {
+                return items.map((item) => ({
+                    text: item.text || '',
+                    time: typeof item.time === 'number' ? item.time : null,
+                    end_time: typeof item.end_time === 'number' ? item.end_time : null,
+                }));
+            }
+            return fallbackLines.map((text, index) => ({
+                text: text,
+                time: typeof fallbackTimes[index] === 'number' ? fallbackTimes[index] : null,
+                end_time: null,
+            }));
+        }
+
+        let lyricsData = normalizeLyricsData(draftLyricsData, lyricsLines, initialTimes);
+        const originalLyricsSnapshot = normalizeLyricsData(
+            originalLyricsDataSeed,
+            lyricsLines,
+            initialTimes
+        );
+        const originalLyricsData = JSON.parse(JSON.stringify(originalLyricsSnapshot));
+
+        const lyricsContainer = document.getElementById('lyrics-container');
+        const srtPreview = document.getElementById('srt-preview');
+        const currentTimeLabel = document.getElementById('current-time');
+        const saveStatus = document.getElementById('save-status');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const setTimeBtn = document.getElementById('set-time-btn');
+        const lineCaptureBtn = document.getElementById('line-capture-btn');
+        const autoAdvanceToggle = document.getElementById('auto-advance-toggle');
+        const previewToggle = document.getElementById('preview-toggle');
+        const srtPanel = document.getElementById('srt-panel');
+        const layout = document.getElementById('layout');
+        const seekSlider = document.getElementById('seek-slider');
+        const rippleToggle = document.getElementById('ripple-toggle');
+        const rippleToast = document.getElementById('ripple-toast');
+        const draftSavedAt = draftMeta && draftMeta.updated_at ? draftMeta.updated_at : null;
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
+
+        let selectedIndex = 0;
+        let lineElements = [];
+        let startInputs = [];
+        let endInputs = [];
+        let textInputs = [];
+        let captureActive = false;
+        let captureLineIndex = null;
+        let isSeeking = false;
+        let toastTimeout = null;
+        const undoStack = [];
+        const redoStack = [];
+
+        if (!draftSavedAt) {
+            rippleToggle.checked = true;
+        }
+
+        function snapshotState() {
+            return {
+                lyricsData: JSON.parse(JSON.stringify(lyricsData)),
+                selectedIndex: selectedIndex,
+            };
+        }
+
+        function updateUndoRedoButtons() {
+            const undoDisabled = undoStack.length === 0;
+            const redoDisabled = redoStack.length === 0;
+            undoBtn.disabled = undoDisabled;
+            redoBtn.disabled = redoDisabled;
+        }
+
+        function recordHistory() {
+            undoStack.push(snapshotState());
+            redoStack.length = 0;
+            updateUndoRedoButtons();
+        }
+
+        function applySnapshot(snapshot) {
+            lyricsData = JSON.parse(JSON.stringify(snapshot.lyricsData));
+            selectedIndex = typeof snapshot.selectedIndex === 'number' ? snapshot.selectedIndex : 0;
+            renderLines();
+            updatePreview();
+            const currentTime = wavesurfer.getCurrentTime();
+            updateTimeLabel(currentTime);
+            updateSliderFromTime(currentTime);
+            updateActiveLine(currentTime);
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (!undoStack.length) {
+                return;
+            }
+            const snapshot = undoStack.pop();
+            redoStack.push(snapshotState());
+            applySnapshot(snapshot);
+        }
+
+        function redo() {
+            if (!redoStack.length) {
+                return;
+            }
+            const snapshot = redoStack.pop();
+            undoStack.push(snapshotState());
+            applySnapshot(snapshot);
+        }
+
+        function showRippleToast(deltaSeconds, count) {
+            if (!count) {
+                return;
+            }
+            const sign = deltaSeconds >= 0 ? '+' : '';
+            rippleToast.textContent = `Δ ${sign}${deltaSeconds.toFixed(3)}s applied to ${count} line${count > 1 ? 's' : ''}`;
+            rippleToast.style.display = 'inline-block';
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+                toastTimeout = null;
+            }
+        }
+
+        function applyRipple(startIndex, deltaSeconds) {
+            if (!rippleToggle.checked || !Number.isFinite(deltaSeconds) || deltaSeconds === 0) {
+                return 0;
+            }
+            let affected = 0;
+            for (let i = startIndex + 1; i < lyricsData.length; i++) {
+                const item = lyricsData[i];
+                if (item.time !== null && item.time !== undefined) {
+                    item.time = Math.max(0, item.time + deltaSeconds);
+                    startInputs[i].value = formatSrtTime(item.time);
+                    affected += 1;
+                }
+                if (item.end_time !== null && item.end_time !== undefined) {
+                    item.end_time = Math.max(0, item.end_time + deltaSeconds);
+                    endInputs[i].value = formatSrtTime(getLineEndTime(i));
+                }
+            }
+            refreshEndInputs();
+            updatePreview();
+            showRippleToast(deltaSeconds, affected);
+            return affected;
+        }
+
+        const wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#e0e0e0',
+            progressColor: '#333333',
+            cursorColor: '#333333',
+            barWidth: 1,
+            barRadius: 0,
+            cursorWidth: 1,
+            height: 80,
+            barGap: 0,
+            responsive: true
+        });
+
+        wavesurfer.load("{{ url_for('upload.serve_audio', filename=audio_file) }}");
+
+        function updateTimeLabel(seconds) {
+            currentTimeLabel.textContent = formatSrtTime(seconds);
+        }
+
+        function updateSliderFromTime(seconds) {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const ratio = Math.min(1, Math.max(0, seconds / duration));
+            seekSlider.value = Math.round(ratio * 1000);
+        }
+
+        function parseTimeInput(value) {
+            const trimmed = value.trim();
+            if (!trimmed) {
+                return null;
+            }
+            const normalized = trimmed.replace(',', '.');
+            const parts = normalized.split(':');
+            if (parts.length === 1) {
+                const numeric = Number(normalized);
+                return Number.isFinite(numeric) ? numeric : null;
+            }
+            if (parts.length === 2 || parts.length === 3) {
+                const numericParts = parts.map(part => Number(part));
+                if (numericParts.some(Number.isNaN)) {
+                    return null;
+                }
+                let hours = 0;
+                let minutes = 0;
+                let seconds = 0;
+                if (parts.length === 3) {
+                    [hours, minutes, seconds] = numericParts;
+                } else {
+                    [minutes, seconds] = numericParts;
+                }
+                return (hours * 3600) + (minutes * 60) + seconds;
+            }
+            return null;
+        }
+
+        function getLineEndTime(index) {
+            const current = lyricsData[index];
+            if (!current) {
+                return null;
+            }
+            if (current.end_time !== null && current.end_time !== undefined) {
+                return current.end_time;
+            }
+            if (current.time !== null && current.time !== undefined) {
+                const nextTime = getNextStartTime(index);
+                return nextTime !== null ? nextTime : current.time + 2;
+            }
+            return null;
+        }
+
+        function getNextStartTime(index) {
+            for (let i = index + 1; i < lyricsData.length; i++) {
+                const time = lyricsData[i].time;
+                if (time !== null && time !== undefined) {
+                    return time;
+                }
+            }
+            return null;
+        }
+
+        function refreshEndInputs() {
+            endInputs.forEach((input, index) => {
+                input.value = formatSrtTime(getLineEndTime(index));
+            });
+        }
+
+        function renderLines() {
+            lyricsContainer.innerHTML = '';
+            lineElements = [];
+            startInputs = [];
+            endInputs = [];
+            textInputs = [];
+
+            lyricsData.forEach((item, index) => {
+                const line = document.createElement('div');
+                line.className = 'line';
+                line.dataset.index = index;
+
+                const startGroup = document.createElement('div');
+                startGroup.className = 'time-group';
+
+                const startInput = document.createElement('input');
+                startInput.type = 'text';
+                startInput.className = 'time-input';
+                startInput.value = formatSrtTime(item.time);
+                startInput.addEventListener('change', () => {
+                    recordHistory();
+                    const previous = item.time;
+                    item.time = parseTimeInput(startInput.value);
+                    startInput.value = formatSrtTime(item.time);
+                    if (previous !== null && item.time !== null) {
+                        const delta = item.time - previous;
+                        applyRipple(index, delta);
+                    }
+                    refreshEndInputs();
+                    updatePreview();
+                });
+
+                const startSetBtn = document.createElement('button');
+                startSetBtn.type = 'button';
+                startSetBtn.className = 'time-set-btn';
+                startSetBtn.textContent = 'Set';
+                startSetBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    recordHistory();
+                    selectLine(index);
+                    const previous = item.time;
+                    const current = wavesurfer.getCurrentTime();
+                    setLineStart(index, current);
+                    if (previous !== null) {
+                        applyRipple(index, current - previous);
+                    }
+                });
+
+                const textInput = document.createElement('input');
+                textInput.type = 'text';
+                textInput.className = 'text-input';
+                textInput.value = item.text;
+                textInput.addEventListener('input', () => {
+                    if (!textInput.dataset.historyRecorded) {
+                        recordHistory();
+                        textInput.dataset.historyRecorded = '1';
+                    }
+                    item.text = textInput.value;
+                    updatePreview();
+                });
+                textInput.addEventListener('blur', () => {
+                    textInput.dataset.historyRecorded = '';
+                });
+
+                line.addEventListener('click', () => {
+                    selectLine(index);
+                    const startTime = lyricsData[index].time;
+                    if (startTime !== null && startTime !== undefined) {
+                        const duration = wavesurfer.getDuration();
+                        if (duration && duration > 0) {
+                            wavesurfer.seekTo(Math.min(1, Math.max(0, startTime / duration)));
+                        }
+                    }
+                });
+
+                const endGroup = document.createElement('div');
+                endGroup.className = 'time-group';
+
+                const endInput = document.createElement('input');
+                endInput.type = 'text';
+                endInput.className = 'time-input';
+                endInput.value = formatSrtTime(getLineEndTime(index));
+                endInput.addEventListener('change', () => {
+                    recordHistory();
+                    const previous = getLineEndTime(index);
+                    const parsed = parseTimeInput(endInput.value);
+                    if (parsed === null) {
+                        endInput.value = formatSrtTime(getLineEndTime(index));
+                        return;
+                    }
+                    setLineEnd(index, parsed);
+                    if (previous !== null) {
+                        applyRipple(index, parsed - previous);
+                    }
+                });
+
+                const endSetBtn = document.createElement('button');
+                endSetBtn.type = 'button';
+                endSetBtn.className = 'time-set-btn';
+                endSetBtn.textContent = 'Set';
+                endSetBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    recordHistory();
+                    selectLine(index);
+                    const previous = getLineEndTime(index);
+                    const current = wavesurfer.getCurrentTime();
+                    setLineEnd(index, current);
+                    if (previous !== null) {
+                        applyRipple(index, current - previous);
+                    }
+                });
+
+                startGroup.appendChild(startInput);
+                startGroup.appendChild(startSetBtn);
+
+                endGroup.appendChild(endInput);
+                endGroup.appendChild(endSetBtn);
+
+                line.appendChild(startGroup);
+                line.appendChild(textInput);
+                line.appendChild(endGroup);
+                lyricsContainer.appendChild(line);
+
+                lineElements.push(line);
+                startInputs.push(startInput);
+                endInputs.push(endInput);
+                textInputs.push(textInput);
+            });
+
+            selectLine(selectedIndex);
+        }
+
+        function selectLine(index) {
+            selectedIndex = index;
+            lineElements.forEach((line, idx) => {
+                line.classList.toggle('selected', idx === index);
+            });
+        }
+
+        function setLineStart(index, currentTime) {
+            if (index === null || index < 0 || index >= lyricsData.length) {
+                return;
+            }
+            lyricsData[index].time = currentTime;
+            startInputs[index].value = formatSrtTime(currentTime);
+            refreshEndInputs();
+            updatePreview();
+        }
+
+        function setLineEnd(index, endTime) {
+            if (index === null || index < 0 || index >= lyricsData.length) {
+                return;
+            }
+            const startTime = lyricsData[index].time;
+            if (startTime !== null && endTime < startTime) {
+                endTime = startTime + 0.1;
+            }
+            lyricsData[index].end_time = endTime;
+            refreshEndInputs();
+            updatePreview();
+        }
+
+        function setCurrentTimeOnLine() {
+            if (selectedIndex === null || selectedIndex < 0 || selectedIndex >= lyricsData.length) {
+                return;
+            }
+            setLineStart(selectedIndex, wavesurfer.getCurrentTime());
+        }
+
+        function getCaptureIndex() {
+            const activeIndex = findActiveLineIndex(wavesurfer.getCurrentTime());
+            if (activeIndex !== -1) {
+                return activeIndex;
+            }
+            if (selectedIndex !== null && selectedIndex >= 0 && selectedIndex < lyricsData.length) {
+                return selectedIndex;
+            }
+            return 0;
+        }
+
+        function startCapture() {
+            if (captureActive) {
+                return;
+            }
+            recordHistory();
+            captureActive = true;
+            captureLineIndex = getCaptureIndex();
+            selectLine(captureLineIndex);
+            const previous = lyricsData[captureLineIndex].time;
+            const current = wavesurfer.getCurrentTime();
+            setLineStart(captureLineIndex, current);
+            if (previous !== null) {
+                applyRipple(captureLineIndex, current - previous);
+            }
+            lineCaptureBtn.textContent = 'Release to End Line';
+            lineCaptureBtn.classList.add('active');
+        }
+
+        function endCapture() {
+            if (!captureActive) {
+                return;
+            }
+            const endTime = wavesurfer.getCurrentTime();
+            if (captureLineIndex !== null && captureLineIndex >= 0 && captureLineIndex < lyricsData.length) {
+                const previous = getLineEndTime(captureLineIndex);
+                setLineEnd(captureLineIndex, endTime);
+                if (previous !== null) {
+                    applyRipple(captureLineIndex, endTime - previous);
+                }
+            }
+            captureActive = false;
+            captureLineIndex = null;
+            lineCaptureBtn.textContent = 'Click to Begin Line';
+            lineCaptureBtn.classList.remove('active');
+        }
+
+        function findActiveLineIndex(currentTime) {
+            let earliestIndex = -1;
+            let earliestStart = null;
+
+            for (let i = 0; i < lyricsData.length; i++) {
+                const start = lyricsData[i].time;
+                if (start === null || start === undefined) {
+                    continue;
+                }
+                const end = getLineEndTime(i);
+                if (end === null || end === undefined) {
+                    continue;
+                }
+                if (currentTime >= start && currentTime <= end) {
+                    if (earliestStart === null || start < earliestStart) {
+                        earliestStart = start;
+                        earliestIndex = i;
+                    }
+                }
+            }
+
+            return earliestIndex;
+        }
+
+        let lastActiveIndex = null;
+        function updateActiveLine(currentTime) {
+            const activeIndex = findActiveLineIndex(currentTime);
+            lineElements.forEach((line, index) => {
+                line.classList.toggle('active', index === activeIndex);
+            });
+            if (activeIndex >= 0 && activeIndex !== lastActiveIndex && !captureActive) {
+                lineElements[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                lastActiveIndex = activeIndex;
+            }
+        }
+
+        function buildSrtPreview(data) {
+            const validIndices = [];
+            data.forEach((item, idx) => {
+                if (item.time !== null) {
+                    validIndices.push(idx);
+                }
+            });
+            if (validIndices.length === 0) {
+                return 'No timestamps yet.';
+            }
+            let output = '';
+            validIndices.forEach((lineIndex, index) => {
+                const item = data[lineIndex];
+                const startTime = item.time;
+                const nextIndex = index + 1 < validIndices.length ? validIndices[index + 1] : null;
+                let endTime = item.end_time;
+                if (endTime === null || endTime === undefined) {
+                    endTime = nextIndex !== null ? data[nextIndex].time : startTime + 2;
+                }
+                if (endTime < startTime) {
+                    endTime = startTime + 0.1;
+                }
+                const start = formatSrtTime(startTime);
+                const end = formatSrtTime(endTime);
+                output += `${index + 1}\n${start} --> ${end}\n${item.text}\n\n`;
+            });
+            return output.trim();
+        }
+
+        function formatSrtTime(seconds) {
+            if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
+                return '';
+            }
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds * 1000) % 1000);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+        }
+
+        function updatePreview() {
+            srtPreview.textContent = buildSrtPreview(lyricsData);
+        }
+
+        function saveDraft() {
+            saveStatus.textContent = '';
+            fetch("{{ url_for('ai.save_draft') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    basename: basename,
+                    lyrics_data: lyricsData
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    saveStatus.textContent = 'Draft saved.';
+                    rippleToggle.checked = false;
+                    rippleToast.style.display = 'none';
+                } else {
+                    alert('Error saving draft: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error saving draft:', error);
+                alert('Failed to save the AI draft.');
+            });
+        }
+
+        playPauseBtn.addEventListener('click', () => {
+            wavesurfer.playPause();
+        });
+
+        setTimeBtn.addEventListener('click', () => {
+            recordHistory();
+            setCurrentTimeOnLine();
+        });
+
+        previewToggle.addEventListener('click', () => {
+            const isHidden = srtPanel.style.display === 'none';
+            if (isHidden) {
+                srtPanel.style.display = 'block';
+                layout.classList.add('with-preview');
+                previewToggle.textContent = 'Hide SRT Preview';
+                previewToggle.classList.add('active');
+            } else {
+                srtPanel.style.display = 'none';
+                layout.classList.remove('with-preview');
+                previewToggle.textContent = 'Show SRT Preview';
+                previewToggle.classList.remove('active');
+            }
+        });
+
+        lineCaptureBtn.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            startCapture();
+        });
+
+        document.addEventListener('mouseup', () => {
+            endCapture();
+        });
+
+        lineCaptureBtn.addEventListener('touchstart', (event) => {
+            event.preventDefault();
+            startCapture();
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            endCapture();
+        });
+
+        const restartBtn = document.getElementById('restart-btn');
+        restartBtn.addEventListener('click', () => {
+            wavesurfer.seekTo(0);
+            wavesurfer.pause();
+            selectLine(0);
+            updateActiveLine(0);
+            updateTimeLabel(0);
+            updateSliderFromTime(0);
+        });
+
+        const offsetInput = document.getElementById('offset-input');
+        document.getElementById('apply-offset-btn').addEventListener('click', () => {
+            const offsetSeconds = Number(offsetInput.value);
+            if (!Number.isFinite(offsetSeconds) || offsetSeconds === 0) {
+                return;
+            }
+            recordHistory();
+            lyricsData.forEach((item, index) => {
+                if (item.time !== null) {
+                    item.time = Math.max(0, item.time + offsetSeconds);
+                    startInputs[index].value = formatSrtTime(item.time);
+                }
+                if (item.end_time !== null && item.end_time !== undefined) {
+                    item.end_time = Math.max(0, item.end_time + offsetSeconds);
+                }
+            });
+            refreshEndInputs();
+            updatePreview();
+            offsetInput.value = 0;
+        });
+
+        document.getElementById('auto-offset-btn').addEventListener('click', () => {
+            if (selectedIndex === null || selectedIndex < 0 || selectedIndex >= lyricsData.length) {
+                return;
+            }
+            const currentTime = wavesurfer.getCurrentTime();
+            const lineTime = lyricsData[selectedIndex].time;
+            if (lineTime === null) {
+                recordHistory();
+                setLineStart(selectedIndex, currentTime);
+                return;
+            }
+            const offsetSeconds = currentTime - lineTime;
+            if (!Number.isFinite(offsetSeconds) || offsetSeconds === 0) {
+                return;
+            }
+            recordHistory();
+            lyricsData.forEach((item, index) => {
+                if (item.time !== null) {
+                    item.time = Math.max(0, item.time + offsetSeconds);
+                    startInputs[index].value = formatSrtTime(item.time);
+                }
+                if (item.end_time !== null && item.end_time !== undefined) {
+                    item.end_time = Math.max(0, item.end_time + offsetSeconds);
+                }
+            });
+            refreshEndInputs();
+            updatePreview();
+        });
+
+        wavesurfer.on('play', () => {
+            playPauseBtn.textContent = 'Pause';
+        });
+
+        wavesurfer.on('pause', () => {
+            playPauseBtn.textContent = 'Play';
+        });
+
+        wavesurfer.on('finish', () => {
+            playPauseBtn.textContent = 'Play';
+        });
+
+        wavesurfer.on('audioprocess', () => {
+            const time = wavesurfer.getCurrentTime();
+            updateTimeLabel(time);
+            if (!isSeeking) {
+                updateSliderFromTime(time);
+            }
+            updateActiveLine(time);
+        });
+
+        wavesurfer.on('seek', (progress) => {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const time = progress * duration;
+            updateTimeLabel(time);
+            if (!isSeeking) {
+                updateSliderFromTime(time);
+            }
+            updateActiveLine(time);
+        });
+
+        wavesurfer.on('ready', () => {
+            const time = wavesurfer.getCurrentTime();
+            updateTimeLabel(time);
+            updateSliderFromTime(time);
+        });
+
+        seekSlider.addEventListener('input', () => {
+            isSeeking = true;
+            const value = Number(seekSlider.value);
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const time = (value / 1000) * duration;
+            wavesurfer.seekTo(value / 1000);
+            updateTimeLabel(time);
+            updateActiveLine(time);
+        });
+
+        seekSlider.addEventListener('change', () => {
+            isSeeking = false;
+        });
+
+        seekSlider.addEventListener('mousedown', () => {
+            isSeeking = true;
+        });
+
+        seekSlider.addEventListener('mouseup', () => {
+            isSeeking = false;
+        });
+
+        seekSlider.addEventListener('touchstart', () => {
+            isSeeking = true;
+        }, { passive: true });
+
+        seekSlider.addEventListener('touchend', () => {
+            isSeeking = false;
+        }, { passive: true });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT')) {
+                    return;
+                }
+                event.preventDefault();
+                wavesurfer.playPause();
+            }
+            if (event.code === 'Enter') {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT')) {
+                    return;
+                }
+                event.preventDefault();
+                setCurrentTimeOnLine();
+            }
+            if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT')) {
+                    return;
+                }
+                event.preventDefault();
+                undo();
+            }
+            if ((event.ctrlKey || event.metaKey) && (event.shiftKey && event.key.toLowerCase() === 'z')) {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT')) {
+                    return;
+                }
+                event.preventDefault();
+                redo();
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT')) {
+                    return;
+                }
+                event.preventDefault();
+                redo();
+            }
+        });
+
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+
+        document.getElementById('save-btn').addEventListener('click', saveDraft);
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            recordHistory();
+            lyricsData = JSON.parse(JSON.stringify(originalLyricsData));
+            selectedIndex = 0;
+            renderLines();
+            updatePreview();
+            updateActiveLine(0);
+            saveStatus.textContent = '';
+        });
+
+        renderLines();
+        updatePreview();
+        updateUndoRedoButtons();
+    </script>
+</body>
+</html>

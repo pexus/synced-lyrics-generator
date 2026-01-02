@@ -2,14 +2,15 @@
 {% block title %}LRC Content for {{ basename }}{% endblock %}
 {% block content %}
 <div class="container mt-4">
-    <h2>LRC Debug View for: {{ basename }}</h2>
+    {% set download_endpoint = download_endpoint or 'files.download_lrc' %}
+    <h2>LRC Debug View for: {{ basename }}{% if source_label %} ({{ source_label }}){% endif %}</h2>
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">LRC Content</h5>
+            <h5 class="mb-0">LRC Content{% if source_label %} ({{ source_label }}){% endif %}</h5>
         </div>
         <div class="card-body">
             <div class="actions mb-3">
-                <a href="{{ url_for('files.download_lrc', basename=basename) }}" class="btn btn-success">
+                <a href="{{ url_for(download_endpoint, basename=basename) }}" class="btn btn-success">
                     <i class="fas fa-download"></i> Download LRC File
                 </a>
                 <a href="{{ url_for('main.index') }}" class="btn btn-secondary">

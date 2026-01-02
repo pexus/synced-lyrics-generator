@@ -1,11 +1,13 @@
 import datetime
 import os
+import re
 
 from flask import Blueprint, current_app, render_template, request
 from flask_login import current_user, login_required
 
 from extensions import db
 from models import Track
+from utils.lyrics_format import build_lrc_content, build_srt_content, parse_srt_content
 from utils.storage import build_user_path, ensure_user_dirs
 
 lyrics_bp = Blueprint('lyrics', __name__)
@@ -41,6 +43,38 @@ def editor(audio_file, lyrics_file):
     lyrics_lines = [line for line in all_lines if line.strip()]
     blank_lines_count = len(all_lines) - len(lyrics_lines)
     basename = track.basename
+    start_times = [None for _ in lyrics_lines]
+    end_times = [None for _ in lyrics_lines]
+    manual_srt_path = build_user_path(current_user.id, 'srt_output', basename + '.srt')
+    if os.path.exists(manual_srt_path) and os.path.getsize(manual_srt_path) > 0:
+        with open(manual_srt_path, 'r') as file_handle:
+            srt_content = file_handle.read()
+        cues = parse_srt_content(srt_content)
+        if cues:
+            if len(cues) == len(lyrics_lines):
+                for index, cue in enumerate(cues):
+                    start_times[index] = cue.get('start')
+                    end_times[index] = cue.get('end')
+            else:
+                def normalize_text(text):
+                    if not text:
+                        return ''
+                    cleaned = re.sub(r"[^\w\s'\-]", '', text.lower())
+                    return re.sub(r'\s+', ' ', cleaned).strip()
+
+                cue_index = 0
+                for line_index, line in enumerate(lyrics_lines):
+                    target = normalize_text(line)
+                    while cue_index < len(cues):
+                        cue_text = normalize_text(cues[cue_index].get('text'))
+                        if cue_text == target:
+                            start_times[line_index] = cues[cue_index].get('start')
+                            end_times[line_index] = cues[cue_index].get('end')
+                            cue_index += 1
+                            break
+                        cue_index += 1
+
+    has_manual_sync = any(time is not None for time in start_times)
 
     return render_template(
         'editor.html',
@@ -49,6 +83,9 @@ def editor(audio_file, lyrics_file):
         lyrics_file=lyrics_file,
         basename=basename,
         blank_lines_removed=blank_lines_count,
+        start_times=start_times,
+        end_times=end_times,
+        has_manual_sync=has_manual_sync,
     )
 
 
@@ -93,41 +130,19 @@ def save_synced_lyrics():
     if not track:
         return {"status": "error", "message": "Track not found."}, 404
 
-    valid_lyrics_data = [item for item in lyrics_data if item.get('time') is not None]
-    if not valid_lyrics_data:
+    if not any(item.get('time') is not None for item in lyrics_data):
         return {
             'status': 'error',
             'message': 'No valid timestamps found. Please try syncing the lyrics again.'
         }
 
-    lrc_content = ''
-    for item in valid_lyrics_data:
-        minutes = int(item['time'] / 60)
-        seconds = int(item['time'] % 60)
-        hundredths = int((item['time'] * 100) % 100)
-        lrc_content += f'[{minutes:02d}:{seconds:02d}.{hundredths:02d}]{item["text"]}\n'
+    lrc_content = build_lrc_content(lyrics_data)
 
     lrc_path = build_user_path(current_user.id, 'lrc_output', track.basename + '.lrc')
     with open(lrc_path, 'w') as f:
         f.write(lrc_content)
 
-    srt_content = ''
-    for i, item in enumerate(valid_lyrics_data):
-        start_time = item['time']
-        end_time = valid_lyrics_data[i + 1]['time'] if i + 1 < len(valid_lyrics_data) else start_time + 2
-        start_h = int(start_time / 3600)
-        start_m = int(start_time / 60) % 60
-        start_s = int(start_time) % 60
-        start_ms = int(start_time * 1000) % 1000
-        end_h = int(end_time / 3600)
-        end_m = int(end_time / 60) % 60
-        end_s = int(end_time) % 60
-        end_ms = int(end_time * 1000) % 1000
-        srt_content += (
-            f'{start_h:02d}:{start_m:02d}:{start_s:02d},{start_ms:03d} '
-            f'--> {end_h:02d}:{end_m:02d}:{end_s:02d},{end_ms:03d}\n'
-        )
-        srt_content += f'{item["text"]}\n\n'
+    srt_content = build_srt_content(lyrics_data)
 
     srt_path = build_user_path(current_user.id, 'srt_output', track.basename + '.srt')
     with open(srt_path, 'w') as f:

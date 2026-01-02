@@ -5,6 +5,8 @@ services:
     container_name: synced-lyrics
     ports:
       - "5000:5000"
+    environment:
+      - GUNICORN_CMD_ARGS=--timeout 300
     volumes:
       - ./data:/app/data
       - ./storage:/app/storage

@@ -80,6 +80,10 @@
             font-weight: bold;
             color: #555;
         }
+        .form-hint {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
         .file-input-wrapper {
             display: flex;
             align-items: center;
@@ -93,17 +97,20 @@
         }
         .song-item { 
             display: flex; 
-            align-items: center; 
+            align-items: flex-start; 
             padding: 1em; 
             border-bottom: 2px solid #dee2e6;
             gap: 1em;
+            flex-wrap: wrap;
         }
         .song-item:last-child {
             border-bottom: none;
         }
         .song-title { 
-            flex-grow: 1; 
+            flex: 1 1 220px; 
+            min-width: 180px;
             font-size: 0.9em; 
+            word-break: break-word;
         }
         .status-indicator { 
             width: 12px; 
@@ -119,8 +126,10 @@
             display: flex;
             align-items: center;
             gap: 0.5em;
-            flex-shrink: 0;
             flex-wrap: wrap;
+            flex: 1 1 360px;
+            row-gap: 0.5em;
+            min-width: 0;
         }
         .btn {
             text-decoration: none; 
@@ -161,6 +170,18 @@
         }
         .btn-warning:hover {
             background-color: #e66a0a;
+        }
+        .btn-ai {
+            background-color: #17a2b8;
+        }
+        .btn-ai:hover {
+            background-color: #138496;
+        }
+        .btn-ai-secondary {
+            background-color: #20c997;
+        }
+        .btn-ai-secondary:hover {
+            background-color: #199d78;
         }
         .btn.disabled {
             background-color: #e9ecef;
@@ -344,10 +365,19 @@
                     </div>
                     <div class="form-group">
                         <label for="lyrics-file-input">Lyrics File (.txt)</label>
+                        <div class="form-hint">Use romanized (Latin letters) lyrics for AI alignment.</div>
                         <div class="file-input-wrapper">
                             <label for="lyrics-file-input" class="btn btn-secondary">Browse...</label>
                             <input type="file" id="lyrics-file-input" name="lyrics_file" accept=".txt" {% if at_limit %}disabled{% endif %} required>
                             <span id="lyrics-file-name" class="file-name">No file selected.</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vocal-file-input">Vocal Stem (optional .mp3, .wav)</label>
+                        <div class="file-input-wrapper">
+                            <label for="vocal-file-input" class="btn btn-secondary">Browse...</label>
+                            <input type="file" id="vocal-file-input" name="vocal_file" accept=".mp3,.wav" {% if at_limit %}disabled{% endif %}>
+                            <span id="vocal-file-name" class="file-name">No file selected.</span>
                         </div>
                     </div>
                 </div>
@@ -358,6 +388,7 @@
         </div>
 
         <h2>Song Library</h2>
+        <div class="form-hint">Use romanized (Latin letters) lyrics for AI alignment.</div>
         <div class="song-list">
             {% for status in all_audio_statuses %}
         <div class="song-item">
@@ -366,30 +397,52 @@
             <div class="song-actions">
                 <form action="/upload_lyrics_for/{{ status.basename }}" method="post" enctype="multipart/form-data" style="display: inline-block;" class="upload-lyrics-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <label for="lyrics-upload-{{ status.basename }}" class="btn btn-primary">Browse/Upload Lyrics</label>
+                    <label for="lyrics-upload-{{ status.basename }}" class="btn btn-primary" title="Use romanized (Latin letters) lyrics for AI alignment.">Browse/Upload Lyrics</label>
                     <input type="file" name="lyrics_file" id="lyrics-upload-{{ status.basename }}" accept=".txt" style="display: none;" onchange="this.form.submit()">
+                </form>
+                <form action="/upload_vocals_for/{{ status.basename }}" method="post" enctype="multipart/form-data" style="display: inline-block;" class="upload-vocals-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label for="vocal-upload-{{ status.basename }}" class="btn btn-primary">
+                        {% if status.vocal_exists %}Replace Vocal Stem{% else %}Upload Vocal Stem{% endif %}
+                    </label>
+                    <input type="file" name="vocal_file" id="vocal-upload-{{ status.basename }}" accept=".mp3,.wav" style="display: none;" onchange="this.form.submit()">
                 </form>
 
                 {% if status.has_lyrics %}
-                    <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">View/Edit</a>
+                    <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-success">Manual Review</a>
                     {% if status.is_processed %}
-                        <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')">Re-generate</button>
+                        <button class="btn btn-warning" onclick="regenerateLyrics('{{ status.basename }}', '{{ status.audio }}')">Re-generate Manually</button>
                     {% else %}
-                        <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-warning">Generate</a>
+                        <a href="/editor/{{ status.audio }}/{{ status.lyrics }}" class="btn btn-warning">Generate Manually</a>
                     {% endif %}
                 {% else %}
-                    <a href="/editor/{{ status.audio }}/{{ status.basename }}.txt" class="btn btn-warning">Generate</a>
+                    <a href="/editor/{{ status.audio }}/{{ status.basename }}.txt" class="btn btn-warning">Generate Manually</a>
+                {% endif %}
+
+                {% if status.has_lyrics %}
+                    <a href="{{ url_for('ai.processing', basename=status.basename) }}" class="btn btn-ai">Generate using AI</a>
+                    {% if status.ai_draft_exists %}
+                        <a href="{{ url_for('ai.editor', basename=status.basename) }}" class="btn btn-ai-secondary">AI Review</a>
+                    {% endif %}
                 {% endif %}
 
                 {% set lrc_file_exists = status.lrc_exists %}
                 {% set srt_file_exists = status.srt_exists %}
-                
+                {% set ai_lrc_file_exists = status.ai_lrc_exists %}
+                {% set ai_srt_file_exists = status.ai_srt_exists %}
+
                 <a href="{{ url_for('files.debug_lrc', basename=status.basename) }}" 
                    class="btn {% if lrc_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
-                   {% if not lrc_file_exists %}disabled="disabled"{% endif %}>LRC</a>
+                   {% if not lrc_file_exists %}disabled="disabled"{% endif %}>LRC Manual</a>
                 <a href="{{ url_for('files.debug_srt', basename=status.basename) }}" 
                    class="btn {% if srt_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
-                   {% if not srt_file_exists %}disabled="disabled"{% endif %}>SRT</a>
+                   {% if not srt_file_exists %}disabled="disabled"{% endif %}>SRT Manual</a>
+                <a href="{{ url_for('files.debug_ai_lrc', basename=status.basename) }}" 
+                   class="btn {% if ai_lrc_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
+                   {% if not ai_lrc_file_exists %}disabled="disabled"{% endif %}>LRC AI</a>
+                <a href="{{ url_for('files.debug_ai_srt', basename=status.basename) }}" 
+                   class="btn {% if ai_srt_file_exists %}btn-primary{% else %}btn-secondary disabled{% endif %}" 
+                   {% if not ai_srt_file_exists %}disabled="disabled"{% endif %}>SRT AI</a>
                 <button class="btn btn-danger" onclick="deleteSong('{{ status.basename }}')">Delete</button>
             </div>
         </div>
@@ -482,6 +535,11 @@
             checkFilesAndToggleButton();
         });
 
+        document.getElementById('vocal-file-input').addEventListener('change', function() {
+            var fileName = this.files[0] ? this.files[0].name : "No file selected.";
+            document.getElementById('vocal-file-name').textContent = fileName;
+        });
+
         // Setup form validation
         document.getElementById('upload-form').addEventListener('submit', function(e) {
             const audioFile = document.getElementById('audio-file-input').files[0];
@@ -570,8 +628,8 @@
         
         // Re-generate lyrics
         function regenerateLyrics(basename, audioFile) {
-            if (confirm(`Are you sure you want to re-generate synced lyrics for "${basename}"?`)) {
-                logToConsole(`Regenerating lyrics for ${basename} with audio ${audioFile}`);
+            if (confirm(`Are you sure you want to re-generate manual synced lyrics for "${basename}"?`)) {
+                logToConsole(`Regenerating manual lyrics for ${basename} with audio ${audioFile}`);
                 window.location.href = `/editor/${audioFile}/${basename}.txt`;
             }
         }

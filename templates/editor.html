@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LRC Editor</title>
+    <title>{{ 'Manual Review' if has_manual_sync else 'Generate Manually' }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://unpkg.com/wavesurfer.js"></script>
     <style>
@@ -21,6 +21,13 @@
             padding: 2em;
             border-radius: 8px;
             box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .page-title {
+            text-align: center;
+            margin: 0 0 0.8em;
+            font-size: 1.6em;
+            color: #333;
         }
 
         .instructions {
@@ -52,10 +59,52 @@
         }
 
         #waveform-container {
+            display: block;
+            margin-bottom: 1.5em;
+        }
+
+        .toolbar {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 1em;
-            margin-bottom: 2em;
+            flex-wrap: wrap;
+            margin-bottom: 1em;
+        }
+
+        .transport {
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+            flex-wrap: wrap;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .current-time {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background: #f1f3f5;
+            border-radius: 4px;
+            padding: 0.3em 0.6em;
+            color: #333;
+        }
+
+        .seek-bar {
+            margin-top: 0.5em;
+            display: flex;
+            align-items: center;
+            gap: 0.75em;
+        }
+
+        .seek-bar input[type="range"] {
+            width: 100%;
+            accent-color: #17a2b8;
         }
 
         .waveform-btn {
@@ -63,13 +112,13 @@
             text-decoration: none;
             border: none;
             border-radius: 5px;
-            padding: 1em 0;
+            padding: 0.85em 1.1em;
             font-weight: bold;
             cursor: pointer;
-            width: 100px;
+            min-width: 110px;
             flex-shrink: 0;
             text-align: center;
-            font-size: 1em;
+            font-size: 0.95em;
             transition: background-color 0.2s;
         }
 
@@ -100,8 +149,6 @@
         }
 
         #waveform {
-            flex-grow: 1;
-            /* Waveform takes remaining space */
             width: 100%;
         }
 
@@ -114,11 +161,15 @@
         }
 
         .line {
-            padding: 10px 15px;
-            cursor: default;
+            padding: 10px 12px;
+            cursor: pointer;
             border-bottom: 1px solid #e9ecef;
-            font-size: 1.2em;
+            font-size: 1.05em;
             transition: background-color 0.2s;
+            display: grid;
+            grid-template-columns: 120px 1fr 120px;
+            gap: 0.75em;
+            align-items: center;
         }
 
         .line:last-child {
@@ -126,8 +177,9 @@
         }
 
         .line.active {
-            background-color: #eee;
+            background-color: #eef2f6;
             font-weight: bold;
+            border-left: 3px solid #0d6efd;
         }
 
         .line.pressing {
@@ -138,8 +190,33 @@
         .line.synced {
             color: #28a745;
             font-weight: bold;
-            background-color: rgba(40, 167, 69, 0.1);
+            background-color: rgba(40, 167, 69, 0.08);
             border-left: 3px solid #28a745;
+        }
+
+        .line.synced.active {
+            background-color: #d9f2e0;
+            border-left-color: #1e7e34;
+            color: #1e7e34;
+        }
+
+        .line-text {
+            color: inherit;
+        }
+
+        .time-input {
+            width: 110px;
+            padding: 6px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9em;
+            background: #fff;
+        }
+
+        .time-input[readonly] {
+            background: #f8f9fa;
+            color: #495057;
         }
 
         .actions {
@@ -184,15 +261,29 @@
         #capture-indicator.active {
             display: block;
         }
+
+        @media (max-width: 720px) {
+            .line {
+                grid-template-columns: 1fr;
+            }
+
+            .time-input {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
+        <h2 class="page-title">{{ 'Manual Review' if has_manual_sync else 'Generate Manually' }}</h2>
         <div class="instructions">
             <p><strong style="color: #28a745;">Press Play</strong> to start the audio, then</p>
             <p><strong style="color: #007bff;">HOLD YOUR SPACEBAR DOWN</strong> exactly when the singer starts the highlighted line.</p>
             <p><strong style="color: #007bff;">RELEASE YOUR SPACEBAR</strong> when the line is finished; synced lines turn <span style="color: #28a745; font-weight: bold;">green</span>.</p>
+            <p>Start and end times fill in on each line as you capture.</p>
+            <p>Click a line to jump playback to its start time and continue from there.</p>
+            <p>Use the slider under the waveform to scrub forward or backward.</p>
             <p><strong style="color: #fd7e14;">Need to fix a mistake?</strong> Press <strong>DELETE</strong> to undo the current line, or use the <strong>Reset All</strong> button.</p>
             <p>Files save automatically after the last line is synced.</p>
             
@@ -204,16 +295,32 @@
             <div id="capture-indicator">Spacebar held — capturing this line…</div>
         </div>
 
+        <div class="toolbar">
+            <div class="transport">
+                <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn" title="Return to the start page">Home</a>
+                <button id="play-pause-btn" class="waveform-btn">Play</button>
+                <button id="reset-btn" class="waveform-btn" title="Clear all timestamps and start over">Reset All</button>
+            </div>
+            <div class="status">
+                <span>Current Time:</span>
+                <span id="current-time" class="current-time">00:00:00,000</span>
+            </div>
+        </div>
+
         <div id="waveform-container">
-            <a href="{{ url_for('main.index') }}" id="back-btn" class="waveform-btn" title="Return to the start page">Home</a>
-            <button id="play-pause-btn" class="waveform-btn">Play</button>
-            <button id="reset-btn" class="waveform-btn" title="Clear all timestamps and start over">Reset All</button>
             <div id="waveform"></div>
+            <div class="seek-bar">
+                <input type="range" id="seek-slider" min="0" max="1000" step="1" value="0" aria-label="Seek audio">
+            </div>
         </div>
 
         <div id="lyrics-container">
             {% for line in lyrics_lines %}
-            <div class="line" data-index="{{ loop.index0 }}">{{ line }}</div>
+            <div class="line" data-index="{{ loop.index0 }}">
+                <input class="time-input start-time" type="text" value="" placeholder="--:--:--,---" readonly>
+                <div class="line-text">{{ line }}</div>
+                <input class="time-input end-time" type="text" value="" placeholder="--:--:--,---" readonly>
+            </div>
             {% endfor %}
         </div>
 
@@ -240,28 +347,141 @@
 
         wavesurfer.load("{{ url_for('upload.serve_audio', filename=audio_file) }}");
 
+        wavesurfer.on('ready', () => {
+            updateTimeLabel(0);
+            updateSliderFromTime(0);
+            updateActiveLineByTime(0);
+        });
+
         const playPauseBtn = document.getElementById('play-pause-btn');
         const resetBtn = document.getElementById('reset-btn');
         const captureIndicator = document.getElementById('capture-indicator');
+        const currentTimeLabel = document.getElementById('current-time');
+        const seekSlider = document.getElementById('seek-slider');
         const lines = document.querySelectorAll('.line');
+        const startInputs = document.querySelectorAll('.start-time');
+        const endInputs = document.querySelectorAll('.end-time');
         const actionsContainer = document.getElementById('actions-container');
-        const timestamps = new Array(lines.length).fill(null);
+        const initialStartTimes = {{ start_times|tojson }};
+        const initialEndTimes = {{ end_times|tojson }};
+        const timestamps = Array.isArray(initialStartTimes) && initialStartTimes.length === lines.length
+            ? initialStartTimes.slice()
+            : new Array(lines.length).fill(null);
+        const endTimes = Array.isArray(initialEndTimes) && initialEndTimes.length === lines.length
+            ? initialEndTimes.slice()
+            : new Array(lines.length).fill(null);
         let activeLineIndex = 0;
+        let highlightedIndex = null;
         let spacebarDown = false;
         let pressStartTime = null;
+        let isSeeking = false;
 
         function setActiveLine(index) {
+            if (index === highlightedIndex) {
+                return;
+            }
             lines.forEach((line, i) => {
                 line.classList.remove('active');
                 if (i === index) {
                     line.classList.add('active');
-                    line.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
+                }
+            });
+            if (index !== null && index !== undefined) {
+                lines[index].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+            highlightedIndex = index;
+        }
+
+        function formatSrtTime(seconds) {
+            if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
+                return '';
+            }
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds * 1000) % 1000);
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+        }
+
+        function updateTimeLabel(seconds) {
+            currentTimeLabel.textContent = formatSrtTime(seconds);
+        }
+
+        function updateSliderFromTime(seconds) {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const ratio = Math.min(1, Math.max(0, seconds / duration));
+            seekSlider.value = Math.round(ratio * 1000);
+        }
+
+        function seekToTime(seconds) {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const ratio = Math.min(1, Math.max(0, seconds / duration));
+            wavesurfer.seekTo(ratio);
+            updateTimeLabel(seconds);
+            updateSliderFromTime(seconds);
+        }
+
+        function updateActiveLineByTime(seconds) {
+            if (spacebarDown) {
+                return;
+            }
+            let lastStartIndex = null;
+            for (let i = 0; i < timestamps.length; i++) {
+                const start = timestamps[i];
+                if (start === null || start === undefined) {
+                    continue;
+                }
+                if (start <= seconds) {
+                    lastStartIndex = i;
+                }
+            }
+            let nextIndex = activeLineIndex;
+            if (lastStartIndex !== null) {
+                const endTime = endTimes[lastStartIndex];
+                if (endTime === null || endTime === undefined || seconds <= endTime) {
+                    nextIndex = lastStartIndex;
+                } else if (lastStartIndex < lines.length - 1) {
+                    nextIndex = lastStartIndex + 1;
+                } else {
+                    nextIndex = lastStartIndex;
+                }
+            }
+            activeLineIndex = nextIndex;
+            setActiveLine(activeLineIndex);
+        }
+
+        function applyInitialTimes() {
+            timestamps.forEach((time, index) => {
+                if (time !== null && time !== undefined) {
+                    startInputs[index].value = formatSrtTime(time);
+                    lines[index].classList.add('synced');
+                }
+            });
+            endTimes.forEach((time, index) => {
+                if (time !== null && time !== undefined) {
+                    endInputs[index].value = formatSrtTime(time);
                 }
             });
         }
+
+        lines.forEach((line, index) => {
+            line.addEventListener('click', () => {
+                activeLineIndex = index;
+                setActiveLine(activeLineIndex);
+                if (timestamps[index] !== null) {
+                    seekToTime(timestamps[index]);
+                }
+            });
+        });
 
         playPauseBtn.addEventListener('click', () => {
             wavesurfer.playPause();
@@ -269,14 +489,76 @@
 
         wavesurfer.on('play', () => {
             playPauseBtn.textContent = 'Pause';
+            updateActiveLineByTime(wavesurfer.getCurrentTime());
         });
 
         wavesurfer.on('pause', () => {
             playPauseBtn.textContent = 'Play';
+            const current = wavesurfer.getCurrentTime();
+            updateTimeLabel(current);
+            updateSliderFromTime(current);
+            updateActiveLineByTime(current);
         });
 
         wavesurfer.on('finish', () => {
             playPauseBtn.textContent = 'Play';
+            const current = wavesurfer.getCurrentTime();
+            updateTimeLabel(current);
+            updateSliderFromTime(current);
+            updateActiveLineByTime(current);
+        });
+
+        wavesurfer.on('audioprocess', (time) => {
+            if (!isSeeking) {
+                updateTimeLabel(time);
+                updateSliderFromTime(time);
+                updateActiveLineByTime(time);
+            }
+        });
+
+        wavesurfer.on('seek', (progress) => {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const time = progress * duration;
+            updateTimeLabel(time);
+            updateSliderFromTime(time);
+            updateActiveLineByTime(time);
+        });
+
+        seekSlider.addEventListener('input', () => {
+            const duration = wavesurfer.getDuration();
+            if (!duration || duration <= 0) {
+                return;
+            }
+            const value = Number(seekSlider.value);
+            const ratio = Math.min(1, Math.max(0, value / 1000));
+            const time = ratio * duration;
+            isSeeking = true;
+            updateTimeLabel(time);
+            wavesurfer.seekTo(ratio);
+            updateActiveLineByTime(time);
+        });
+
+        seekSlider.addEventListener('change', () => {
+            isSeeking = false;
+        });
+
+        seekSlider.addEventListener('mousedown', () => {
+            isSeeking = true;
+        });
+
+        seekSlider.addEventListener('mouseup', () => {
+            isSeeking = false;
+        });
+
+        seekSlider.addEventListener('touchstart', () => {
+            isSeeking = true;
+        });
+
+        seekSlider.addEventListener('touchend', () => {
+            isSeeking = false;
         });
 
         function saveSyncedLyrics() {
@@ -284,11 +566,16 @@
             let syncedCount = 0;
             
             lines.forEach((line, index) => {
-                lyricsData.push({
-                    text: line.innerText,
+                const lineText = line.querySelector('.line-text').textContent;
+                const entry = {
+                    text: lineText,
                     time: timestamps[index]
-                });
-                
+                };
+                if (endTimes[index] !== null) {
+                    entry.end_time = endTimes[index];
+                }
+                lyricsData.push(entry);
+
                 if (timestamps[index] !== null) {
                     syncedCount++;
                 }
@@ -358,11 +645,22 @@
         function resetAndTryAgain() {
             if (confirm('Are you sure you want to reset all timestamps and try again?')) {
                 timestamps.fill(null);
-                lines.forEach(line => line.classList.remove('synced'));
+                endTimes.fill(null);
+                lines.forEach(line => line.classList.remove('synced', 'pressing', 'active'));
+                startInputs.forEach(input => {
+                    input.value = '';
+                });
+                endInputs.forEach(input => {
+                    input.value = '';
+                });
                 activeLineIndex = 0;
+                spacebarDown = false;
+                pressStartTime = null;
                 setActiveLine(0);
                 wavesurfer.seekTo(0);
                 wavesurfer.pause();
+                updateTimeLabel(0);
+                updateSliderFromTime(0);
                 actionsContainer.innerHTML = '';
             }
         }
@@ -375,20 +673,26 @@
                     spacebarDown = true;
                     pressStartTime = wavesurfer.getCurrentTime();
                     timestamps[activeLineIndex] = pressStartTime;
+                    endTimes[activeLineIndex] = null;
+                    startInputs[activeLineIndex].value = formatSrtTime(pressStartTime);
+                    endInputs[activeLineIndex].value = '';
+                    lines[activeLineIndex].classList.remove('synced');
                     lines[activeLineIndex].classList.add('pressing');
                     captureIndicator.classList.add('active');
                 }
             } else if (e.code === 'Delete' || e.code === 'Backspace') {
                 e.preventDefault();
-                if (activeLineIndex > 0) {
-                    activeLineIndex--;
+                if (activeLineIndex >= 0 && activeLineIndex < lines.length) {
                     timestamps[activeLineIndex] = null;
+                    endTimes[activeLineIndex] = null;
+                    startInputs[activeLineIndex].value = '';
+                    endInputs[activeLineIndex].value = '';
                     lines[activeLineIndex].classList.remove('synced', 'pressing');
                     captureIndicator.classList.remove('active');
                     spacebarDown = false;
                     pressStartTime = null;
                     setActiveLine(activeLineIndex);
-                    actionsContainer.innerHTML = ''; // Clear post-save buttons if user goes back
+                    actionsContainer.innerHTML = '';
                 }
             }
         });
@@ -401,6 +705,11 @@
                     captureIndicator.classList.remove('active');
                     if (activeLineIndex < lines.length) {
                         lines[activeLineIndex].classList.remove('pressing');
+                        const endTime = wavesurfer.getCurrentTime();
+                        const startTime = timestamps[activeLineIndex];
+                        const resolvedEnd = startTime !== null ? Math.max(startTime, endTime) : endTime;
+                        endTimes[activeLineIndex] = resolvedEnd;
+                        endInputs[activeLineIndex].value = formatSrtTime(resolvedEnd);
                         lines[activeLineIndex].classList.add('synced');
 
                         if (activeLineIndex < lines.length - 1) {
@@ -420,7 +729,14 @@
             e.preventDefault();
             if (confirm('Are you sure you want to reset all timestamps?')) {
                 timestamps.fill(null);
+                endTimes.fill(null);
                 lines.forEach(line => line.classList.remove('synced', 'pressing', 'active'));
+                startInputs.forEach(input => {
+                    input.value = '';
+                });
+                endInputs.forEach(input => {
+                    input.value = '';
+                });
                 activeLineIndex = 0;
                 spacebarDown = false;
                 pressStartTime = null;
@@ -428,11 +744,19 @@
                 setActiveLine(0);
                 wavesurfer.seekTo(0);
                 wavesurfer.pause();
+                updateTimeLabel(0);
+                updateSliderFromTime(0);
                 actionsContainer.innerHTML = '';
             }
         });
 
-        setActiveLine(0);
+        applyInitialTimes();
+        let firstUnsynced = timestamps.findIndex(time => time === null || time === undefined);
+        if (firstUnsynced === -1) {
+            firstUnsynced = 0;
+        }
+        activeLineIndex = firstUnsynced;
+        setActiveLine(activeLineIndex);
     </script>
 </body>
 

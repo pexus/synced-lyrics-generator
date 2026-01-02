@@ -2,16 +2,38 @@
 {% block title %}SRT Content for {{ basename }}{% endblock %}
 {% block content %}
 <div class="container mt-4">
-    <h2>SRT Debug View for: {{ basename }}</h2>
+    {% set download_raw_endpoint = download_raw_endpoint or 'files.download_srt' %}
+    {% set download_numbered_endpoint = download_numbered_endpoint or 'files.download_srt_numbered' %}
+    {% set view_raw_endpoint = view_raw_endpoint or 'files.debug_srt' %}
+    {% set view_numbered_endpoint = view_numbered_endpoint or 'files.debug_srt_numbered' %}
+    <h2>SRT Debug View for: {{ basename }}{% if source_label %} ({{ source_label }}){% endif %}</h2>
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">SRT Content</h5>
+            <h5 class="mb-0">SRT Content{% if numbered %} (Numbered){% endif %}{% if source_label %} ({{ source_label }}){% endif %}</h5>
         </div>
         <div class="card-body">
             <div class="actions mb-3">
-                <a href="{{ url_for('files.download_srt', basename=basename) }}" class="btn btn-success">
-                    <i class="fas fa-download"></i> Download SRT File
-                </a>
+                {% if numbered %}
+                    <a href="{{ url_for(download_numbered_endpoint, basename=basename) }}" class="btn btn-success">
+                        <i class="fas fa-download"></i> Download Numbered SRT
+                    </a>
+                    <a href="{{ url_for(download_raw_endpoint, basename=basename) }}" class="btn btn-secondary">
+                        <i class="fas fa-download"></i> Download SRT (No Numbers)
+                    </a>
+                    <a href="{{ url_for(view_raw_endpoint, basename=basename) }}" class="btn btn-info">
+                        View Raw SRT
+                    </a>
+                {% else %}
+                    <a href="{{ url_for(download_raw_endpoint, basename=basename) }}" class="btn btn-success">
+                        <i class="fas fa-download"></i> Download SRT (No Numbers)
+                    </a>
+                    <a href="{{ url_for(download_numbered_endpoint, basename=basename) }}" class="btn btn-secondary">
+                        <i class="fas fa-download"></i> Download Numbered SRT
+                    </a>
+                    <a href="{{ url_for(view_numbered_endpoint, basename=basename) }}" class="btn btn-info">
+                        View Numbered SRT
+                    </a>
+                {% endif %}
                 <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
                     <i class="fas fa-home"></i> Back to Home
                 </a>
